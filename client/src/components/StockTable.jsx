@@ -11,7 +11,8 @@ import {
   AlertCircle, 
   RefreshCw,
   Calendar,
-  Tag
+  Tag,
+  FlaskConical
 } from 'lucide-react';
 import { getItems, createItem, updateItem, deleteItem } from '@/services/itemService';
 import { createBatch, updateBatch, deleteBatch } from '@/services/batchService';
@@ -23,6 +24,7 @@ import { Card } from '@/components/ui/Card';
 import { ItemFormModal } from './ItemFormModal';
 import { BatchFormModal } from './BatchFormModal';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
+import { AlternativesModal } from './AlternativesModal';
 
 export function StockTable({ storeType = 'medical' }) {
   const [items, setItems] = useState([]);
@@ -42,6 +44,9 @@ export function StockTable({ storeType = 'medical' }) {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null); // { type: 'item' | 'batch', data: item | batch }
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [isAlternativesOpen, setIsAlternativesOpen] = useState(false);
+  const [alternativesItem, setAlternativesItem] = useState(null);
 
   // Fetch Items
   const fetchItems = useCallback(async () => {
@@ -435,6 +440,17 @@ export function StockTable({ storeType = 'medical' }) {
 
                         <button
                           onClick={() => {
+                            setAlternativesItem(item);
+                            setIsAlternativesOpen(true);
+                          }}
+                          className="p-1.5 rounded-lg text-secondary hover:text-secondary-dark hover:bg-teal-50 transition-colors"
+                          title="View Salt Alternatives"
+                        >
+                          <FlaskConical className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          onClick={() => {
                             setEditingItem(item);
                             setIsItemModalOpen(true);
                           }}
@@ -606,6 +622,16 @@ export function StockTable({ storeType = 'medical' }) {
             ? `Are you sure you want to delete "${deleteTarget?.data?.name}"? This will permanently delete the item and all its associated batch records.`
             : `Are you sure you want to delete batch "${deleteTarget?.data?.batchNo}"?`
         }
+      />
+
+      {/* Alternatives Modal */}
+      <AlternativesModal
+        isOpen={isAlternativesOpen}
+        onClose={() => {
+          setIsAlternativesOpen(false);
+          setAlternativesItem(null);
+        }}
+        item={alternativesItem}
       />
     </div>
   );

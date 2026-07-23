@@ -7,6 +7,7 @@ import {
   ScanLine, 
   Receipt, 
   AlertTriangle, 
+  FlaskConical,
   Settings, 
   LogOut,
   ShieldCheck
@@ -22,6 +23,7 @@ export function Sidebar() {
   const navItems = [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { label: 'Medical Stock', path: '/stock', icon: Pill, disabled: false },
+    { label: 'Composition Search', path: '/composition-search', icon: FlaskConical, disabled: false },
     { label: 'Provision Store', path: '/provision', icon: ShoppingBag, disabled: false },
     { label: 'Invoice Scan', path: '/invoice-scan', icon: ScanLine, disabled: false },
     { label: 'Billing', path: '/billing', icon: Receipt, disabled: true },

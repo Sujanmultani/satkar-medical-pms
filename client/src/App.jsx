@@ -7,6 +7,7 @@ import { StockList } from '@/pages/StockList';
 import { ProvisionStore } from '@/pages/ProvisionStore';
 import { InvoiceScan } from '@/pages/InvoiceScan';
 import { ExpiryAlerts } from '@/pages/ExpiryAlerts';
+import { CompositionSearch } from '@/pages/CompositionSearch';
 import { Sidebar } from '@/components/Sidebar';
 
 // Protected Route Wrapper
@@ -30,6 +31,7 @@ function ProtectedLayout() {
           <Route path="/provision-store" element={<ProvisionStore />} />
           <Route path="/invoice-scan" element={<InvoiceScan />} />
           <Route path="/expiry-alerts" element={<ExpiryAlerts />} />
+          <Route path="/composition-search" element={<CompositionSearch />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>

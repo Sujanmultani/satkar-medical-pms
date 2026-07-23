@@ -3,6 +3,8 @@ const router = express.Router();
 const {
   createItem,
   getItems,
+  searchComposition,
+  getItemAlternatives,
   getItemById,
   updateItem,
   deleteItem,
@@ -14,6 +16,9 @@ router.use(protect);
 router.route('/')
   .post(createItem)
   .get(getItems);
+
+router.get('/search-composition', searchComposition);
+router.get('/:id/alternatives', getItemAlternatives);
 
 router.route('/:id')
   .get(getItemById)

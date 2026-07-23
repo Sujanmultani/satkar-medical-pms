@@ -2,6 +2,27 @@ const Item = require('../models/Item');
 const Batch = require('../models/Batch');
 const { computeBatchStatus } = require('../utils/batchStatus');
 
+// Reusable helper to attach populated batches with computed statuses to items
+const populateItemBatches = async (items) => {
+  if (!items || items.length === 0) return [];
+  const itemIds = items.map((item) => item._id);
+  const batches = await Batch.find({ itemId: { $in: itemIds } }).sort({ expiryDate: 1 }).lean();
+  
+  const batchesByItem = {};
+  batches.forEach((b) => {
+    const batchWithStatus = { ...b, status: computeBatchStatus(b.expiryDate) };
+    if (!batchesByItem[b.itemId.toString()]) {
+      batchesByItem[b.itemId.toString()] = [];
+    }
+    batchesByItem[b.itemId.toString()].push(batchWithStatus);
+  });
+
+  return items.map((item) => ({
+    ...item,
+    batches: batchesByItem[item._id.toString()] || [],
+  }));
+};
+
 // @desc    Create new item
 // @route   POST /api/items
 // @access  Private
@@ -58,28 +79,76 @@ const getItems = async (req, res, next) => {
     }
 
     const items = await Item.find(filter).sort({ createdAt: -1 }).lean();
-    const itemIds = items.map((item) => item._id);
-
-    // Fetch batches for all retrieved items
-    const batches = await Batch.find({ itemId: { $in: itemIds } }).sort({ expiryDate: 1 }).lean();
-
-    // Group batches by itemId and update status dynamically
-    const batchesByItem = {};
-    batches.forEach((b) => {
-      const computedStatus = computeBatchStatus(b.expiryDate);
-      const batchWithStatus = { ...b, status: computedStatus };
-      if (!batchesByItem[b.itemId.toString()]) {
-        batchesByItem[b.itemId.toString()] = [];
-      }
-      batchesByItem[b.itemId.toString()].push(batchWithStatus);
-    });
-
-    const populatedItems = items.map((item) => ({
-      ...item,
-      batches: batchesByItem[item._id.toString()] || [],
-    }));
+    const populatedItems = await populateItemBatches(items);
 
     return res.status(200).json({ data: populatedItems });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Search items strictly by composition / active salt
+// @route   GET /api/items/search-composition
+// @access  Private
+const searchComposition = async (req, res, next) => {
+  try {
+    const { q, storeType } = req.query;
+    if (!q || !q.trim()) {
+      return res.status(200).json({ data: [] });
+    }
+
+    const filter = {
+      composition: new RegExp(q.trim(), 'i'),
+    };
+
+    if (storeType && ['medical', 'provision'].includes(storeType)) {
+      filter.storeType = storeType;
+    }
+
+    const items = await Item.find(filter).sort({ name: 1 }).lean();
+    const populatedItems = await populateItemBatches(items);
+
+    return res.status(200).json({ data: populatedItems });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get brand alternatives for a specific item (same composition, different item)
+// @route   GET /api/items/:id/alternatives
+// @access  Private
+const getItemAlternatives = async (req, res, next) => {
+  try {
+    const targetItem = await Item.findById(req.params.id).lean();
+    if (!targetItem) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Target item not found.' },
+      });
+    }
+
+    if (!targetItem.composition || !targetItem.composition.trim()) {
+      return res.status(200).json({
+        data: [],
+        referenceItem: targetItem,
+        note: 'This item has no composition / salt on record.',
+      });
+    }
+
+    // Find other items sharing the same composition within the same store type
+    const escapedComp = targetItem.composition.trim().replace(/[/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const filter = {
+      _id: { $ne: targetItem._id },
+      storeType: targetItem.storeType,
+      composition: new RegExp(`^${escapedComp}$`, 'i'),
+    };
+
+    const altItems = await Item.find(filter).sort({ name: 1 }).lean();
+    const populatedAlts = await populateItemBatches(altItems);
+
+    return res.status(200).json({
+      data: populatedAlts,
+      referenceItem: targetItem,
+    });
   } catch (error) {
     next(error);
   }
@@ -97,13 +166,8 @@ const getItemById = async (req, res, next) => {
       });
     }
 
-    const batches = await Batch.find({ itemId: item._id }).sort({ expiryDate: 1 }).lean();
-    const batchesWithStatus = batches.map((b) => ({
-      ...b,
-      status: computeBatchStatus(b.expiryDate),
-    }));
-
-    return res.status(200).json({ data: { ...item, batches: batchesWithStatus } });
+    const populated = await populateItemBatches([item]);
+    return res.status(200).json({ data: populated[0] });
   } catch (error) {
     next(error);
   }
@@ -134,13 +198,8 @@ const updateItem = async (req, res, next) => {
 
     await item.save();
 
-    const batches = await Batch.find({ itemId: item._id }).sort({ expiryDate: 1 }).lean();
-    const batchesWithStatus = batches.map((b) => ({
-      ...b,
-      status: computeBatchStatus(b.expiryDate),
-    }));
-
-    return res.status(200).json({ data: { ...item.toObject(), batches: batchesWithStatus } });
+    const populated = await populateItemBatches([item.toObject()]);
+    return res.status(200).json({ data: populated[0] });
   } catch (error) {
     next(error);
   }
@@ -158,7 +217,6 @@ const deleteItem = async (req, res, next) => {
       });
     }
 
-    // Application-level cascade delete of batches
     await Batch.deleteMany({ itemId: item._id });
     await item.deleteOne();
 
@@ -171,6 +229,8 @@ const deleteItem = async (req, res, next) => {
 module.exports = {
   createItem,
   getItems,
+  searchComposition,
+  getItemAlternatives,
   getItemById,
   updateItem,
   deleteItem,
