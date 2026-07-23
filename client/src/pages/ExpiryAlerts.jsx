@@ -9,7 +9,8 @@ import {
   Layers, 
   Calendar,
   Filter,
-  Undo2
+  Undo2,
+  Building2
 } from 'lucide-react';
 import { getExpiringSoon, getExpired, deleteBatch } from '@/services/batchService';
 import { createReturn } from '@/services/returnService';
@@ -280,6 +281,7 @@ export function ExpiryAlerts() {
                 <TableHead>Item Name</TableHead>
                 <TableHead>Store</TableHead>
                 <TableHead>Batch No</TableHead>
+                <TableHead>Supplier</TableHead>
                 <TableHead className="font-mono">Expiry Date</TableHead>
                 <TableHead className="text-center font-mono">Stock Qty</TableHead>
                 <TableHead className="text-right font-mono">MRP (₹)</TableHead>
@@ -317,6 +319,17 @@ export function ExpiryAlerts() {
                     </TableCell>
 
                     <TableCell className="font-mono font-semibold text-primary">{batch.batchNo}</TableCell>
+
+                    <TableCell className="text-xs text-gray-700 font-medium">
+                      {batch.supplierId?.name ? (
+                        <div className="flex items-center gap-1.5 font-sans">
+                          <Building2 className="w-3.5 h-3.5 text-secondary shrink-0" />
+                          <span className="truncate max-w-[140px]" title={batch.supplierId.name}>{batch.supplierId.name}</span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 font-mono">—</span>
+                      )}
+                    </TableCell>
 
                     <TableCell className="font-mono text-xs font-medium">
                       <div className="flex items-center gap-1.5">

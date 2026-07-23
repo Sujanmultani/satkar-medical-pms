@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { ItemFormModal } from './ItemFormModal';
 import { BatchFormModal } from './BatchFormModal';
+import { AddProductModal } from './AddProductModal';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
 import { AlternativesModal } from './AlternativesModal';
 
@@ -34,6 +35,7 @@ export function StockTable({ storeType = 'medical' }) {
   const [expandedItemId, setExpandedItemId] = useState(null);
 
   // Modals state
+  const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
 
@@ -200,10 +202,7 @@ export function StockTable({ storeType = 'medical' }) {
 
         {/* MAGIC UI ACCENT BUTTON: Glowing Shimmer "+ Add Item" Button */}
         <button
-          onClick={() => {
-            setEditingItem(null);
-            setIsItemModalOpen(true);
-          }}
+          onClick={() => setIsAddProductModalOpen(true)}
           className="relative inline-flex overflow-hidden rounded-xl p-[1.5px] focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 shrink-0 group transition-transform active:scale-95"
         >
           <span className="absolute inset-[-1000%] animate-[spin_4s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#0B4C52_0%,#17878E_33%,#5CA627_66%,#0B4C52_100%)]" />
@@ -316,10 +315,7 @@ export function StockTable({ storeType = 'medical' }) {
             <Button
               variant="default"
               size="sm"
-              onClick={() => {
-                setEditingItem(null);
-                setIsItemModalOpen(true);
-              }}
+              onClick={() => setIsAddProductModalOpen(true)}
               className="mt-2 gap-2"
             >
               <Plus className="w-4 h-4" />
@@ -580,7 +576,15 @@ export function StockTable({ storeType = 'medical' }) {
         </Table>
       )}
 
-      {/* Item Modal (Add/Edit) */}
+      {/* Unified Add Product Modal */}
+      <AddProductModal
+        isOpen={isAddProductModalOpen}
+        onClose={() => setIsAddProductModalOpen(false)}
+        onSuccess={fetchItems}
+        storeType={storeType}
+      />
+
+      {/* Item Modal (Edit Item) */}
       <ItemFormModal
         isOpen={isItemModalOpen}
         onClose={() => {
