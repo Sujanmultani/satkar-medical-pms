@@ -70,7 +70,8 @@ const getItems = async (req, res, next) => {
     }
 
     if (search && search.trim()) {
-      const regex = new RegExp(search.trim(), 'i');
+      const escapedSearch = search.trim().replace(/[/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const regex = new RegExp(escapedSearch, 'i');
       filter.$or = [
         { name: regex },
         { composition: regex },
@@ -97,8 +98,9 @@ const searchComposition = async (req, res, next) => {
       return res.status(200).json({ data: [] });
     }
 
+    const escapedQuery = q.trim().replace(/[/\\^$*+?.()|[\]{}]/g, '\\$&');
     const filter = {
-      composition: new RegExp(q.trim(), 'i'),
+      composition: new RegExp(escapedQuery, 'i'),
     };
 
     if (storeType && ['medical', 'provision'].includes(storeType)) {
