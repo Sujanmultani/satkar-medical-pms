@@ -5,6 +5,8 @@ import { markPrinted } from '@/services/billService';
 import logoAsset from '@/assets/satkar-logo.jpeg';
 import { Printer, MessageCircle, Share2, CheckCircle2 } from 'lucide-react';
 
+const BUSINESS_GSTIN = import.meta.env?.VITE_BUSINESS_GSTIN || '';
+
 export function PrintableBill({ isOpen, onClose, bill }) {
   if (!isOpen || !bill) return null;
 
@@ -47,7 +49,9 @@ export function PrintableBill({ isOpen, onClose, bill }) {
               <div>
                 <h2 className="text-lg font-heading font-bold text-primary leading-tight">SATKAR MEDICAL</h2>
                 <p className="text-[10px] text-muted font-mono uppercase">Pharmacy & Provision Store</p>
-                <p className="text-[10px] text-gray-500 mt-0.5">Main Road, Jambusar • GSTIN: <span className="font-mono text-gray-700">24AAAAA0000A1Z5</span></p>
+                <p className="text-[10px] text-gray-500 mt-0.5">
+                  Main Road, Jambusar • GSTIN: <span className="font-mono text-gray-700">{BUSINESS_GSTIN || '[Not Configured]'}</span>
+                </p>
               </div>
             </div>
 
