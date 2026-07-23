@@ -3,18 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { getDashboardSummary } from '@/services/dashboardService';
 import { LogoWatermark } from '@/components/LogoWatermark';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import { 
   Package, 
   Layers, 
   AlertTriangle, 
   Clock, 
-  Receipt, 
   Sparkles,
   ArrowRight,
-  ShieldCheck,
   ScanLine
 } from 'lucide-react';
 
@@ -56,13 +53,13 @@ export function Dashboard() {
           <div>
             <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-secondary mb-1">
               <Sparkles className="w-3.5 h-3.5 text-accent" />
-              <span>Satkar Medical PMS • Phase 4 Active</span>
+              <span>Satkar Medical PMS • Pharmacy & Provision</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold text-primary font-heading">
               Welcome back, {user?.name || 'Admin'}!
             </h1>
             <p className="text-sm text-muted mt-1">
-              Real-time stock metrics, invoice scanning, and automated expiry tracking.
+              Real-time stock metrics, invoice scanning, billing, and automated expiry tracking.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -162,39 +159,6 @@ export function Dashboard() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Phase Progress Banner */}
-        <Card className="glass-panel border-primary/20">
-          <CardHeader>
-            <CardTitle className="text-lg text-primary flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-accent" />
-              System Status Overview
-            </CardTitle>
-            <CardDescription>
-              Phase 1 to 4 features are active and connected to MongoDB Atlas.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono text-text/80">
-              <div className="p-3 rounded-lg bg-surface border border-gray-200/60 flex items-center justify-between">
-                <span>• Medical & Provision Stock CRUD</span>
-                <span className="text-success font-semibold">Phase 2 Active</span>
-              </div>
-              <div className="p-3 rounded-lg bg-surface border border-gray-200/60 flex items-center justify-between">
-                <span>• Google Vision OCR Invoice Scanner</span>
-                <span className="text-success font-semibold">Phase 3 Active</span>
-              </div>
-              <div className="p-3 rounded-lg bg-surface border border-gray-200/60 flex items-center justify-between">
-                <span>• Daily Expiry Cron & Bulk Status Update</span>
-                <span className="text-success font-semibold">Phase 4 Active</span>
-              </div>
-              <div className="p-3 rounded-lg bg-surface border border-gray-200/60 flex items-center justify-between">
-                <span>• Billing & GST Cash Register</span>
-                <span className="text-muted font-semibold">Phase 6 Upcoming</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
