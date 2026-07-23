@@ -1,0 +1,13 @@
+node_modules/
+.env
+*.env
+server/.env
+google-vision-key.json
+server/google-vision-key.json
+dist/
+build/
+*.log
+.DS_Store
+*.key
+*.pem
+git_setup.js
