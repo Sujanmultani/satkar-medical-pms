@@ -110,7 +110,7 @@ export function Billing() {
           batch,
           qty: 1,
           rate: batch.mrp || 0,
-          gst: batch.gstPercent || 0,
+          gst: 0,
         },
       ]);
     }
