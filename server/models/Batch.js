@@ -8,6 +8,11 @@ const batchSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    supplierId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Supplier',
+      index: true,
+    },
     batchNo: {
       type: String,
       required: true,

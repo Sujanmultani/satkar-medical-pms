@@ -1,13 +1,14 @@
 const Batch = require('../models/Batch');
 const Item = require('../models/Item');
 const { computeBatchStatus } = require('../utils/batchStatus');
+const { findOrCreateSupplier } = require('../services/supplierService');
 
 // @desc    Create batch for an item
 // @route   POST /api/batches
 // @access  Private
 const createBatch = async (req, res, next) => {
   try {
-    const { itemId, batchNo, mfgDate, expiryDate, qty, purchaseRate, mrp, gstPercent } = req.body;
+    const { itemId, batchNo, mfgDate, expiryDate, qty, purchaseRate, mrp, gstPercent, supplierName, supplierId } = req.body;
 
     if (!itemId) {
       return res.status(400).json({
@@ -45,10 +46,17 @@ const createBatch = async (req, res, next) => {
       });
     }
 
+    let finalSupplierId = supplierId || undefined;
+    if (supplierName && supplierName.trim()) {
+      const sup = await findOrCreateSupplier({ name: supplierName.trim() });
+      if (sup) finalSupplierId = sup._id;
+    }
+
     const status = computeBatchStatus(expiryDate);
 
     const batch = await Batch.create({
       itemId,
+      supplierId: finalSupplierId,
       batchNo: batchNo.trim(),
       mfgDate: mfgDate ? new Date(mfgDate) : null,
       expiryDate: new Date(expiryDate),
@@ -59,7 +67,9 @@ const createBatch = async (req, res, next) => {
       status,
     });
 
-    return res.status(201).json({ data: batch });
+    const populated = await Batch.findById(batch._id).populate('supplierId', 'name phone address').lean();
+
+    return res.status(201).json({ data: populated });
   } catch (error) {
     next(error);
   }
@@ -76,7 +86,11 @@ const getBatches = async (req, res, next) => {
       filter.itemId = itemId;
     }
 
-    const batches = await Batch.find(filter).sort({ expiryDate: 1 }).lean();
+    const batches = await Batch.find(filter)
+      .populate('supplierId', 'name phone address')
+      .sort({ expiryDate: 1 })
+      .lean();
+
     const batchesWithStatus = batches.map((b) => ({
       ...b,
       status: computeBatchStatus(b.expiryDate),
@@ -93,13 +107,20 @@ const getBatches = async (req, res, next) => {
 // @access  Private
 const updateBatch = async (req, res, next) => {
   try {
-    const { batchNo, mfgDate, expiryDate, qty, purchaseRate, mrp, gstPercent } = req.body;
+    const { batchNo, mfgDate, expiryDate, qty, purchaseRate, mrp, gstPercent, supplierName, supplierId } = req.body;
 
     const batch = await Batch.findById(req.params.id);
     if (!batch) {
       return res.status(404).json({
         error: { code: 'NOT_FOUND', message: 'Batch not found.' },
       });
+    }
+
+    if (supplierName && supplierName.trim()) {
+      const sup = await findOrCreateSupplier({ name: supplierName.trim() });
+      if (sup) batch.supplierId = sup._id;
+    } else if (supplierId !== undefined) {
+      batch.supplierId = supplierId || null;
     }
 
     if (batchNo !== undefined) batch.batchNo = batchNo.trim();
@@ -114,8 +135,9 @@ const updateBatch = async (req, res, next) => {
     if (gstPercent !== undefined) batch.gstPercent = Math.max(0, Number(gstPercent) || 0);
 
     await batch.save();
+    const populated = await Batch.findById(batch._id).populate('supplierId', 'name phone address').lean();
 
-    return res.status(200).json({ data: batch });
+    return res.status(200).json({ data: populated });
   } catch (error) {
     next(error);
   }
@@ -159,6 +181,7 @@ const getBatchesByStatus = async (req, res, next, targetStatus) => {
     const total = await Batch.countDocuments(batchFilter);
     const batches = await Batch.find(batchFilter)
       .populate('itemId', 'name composition category unit hsnCode storeType')
+      .populate('supplierId', 'name phone address')
       .sort({ expiryDate: 1 })
       .skip(skip)
       .limit(limit)

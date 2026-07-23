@@ -137,7 +137,7 @@ const createReturn = async (req, res, next) => {
 
     const populatedReturn = await Return.findById(newReturn._id)
       .populate('itemId', 'name composition category unit hsnCode storeType')
-      .populate('batchId', 'batchNo expiryDate mrp purchaseRate')
+      .populate({ path: 'batchId', select: 'batchNo expiryDate mrp purchaseRate supplierId', populate: { path: 'supplierId', select: 'name phone address' } })
       .populate('referenceBillId', 'billNo billDate totalAmount')
       .lean();
 
@@ -185,7 +185,7 @@ const getReturns = async (req, res, next) => {
     const total = await Return.countDocuments(filter);
     const returnsList = await Return.find(filter)
       .populate('itemId', 'name composition category unit hsnCode storeType')
-      .populate('batchId', 'batchNo expiryDate mrp purchaseRate')
+      .populate({ path: 'batchId', select: 'batchNo expiryDate mrp purchaseRate supplierId', populate: { path: 'supplierId', select: 'name phone address' } })
       .populate('referenceBillId', 'billNo billDate totalAmount')
       .sort({ returnDate: -1, createdAt: -1 })
       .skip(skip)
@@ -213,7 +213,7 @@ const getReturnById = async (req, res, next) => {
   try {
     const returnRecord = await Return.findById(req.params.id)
       .populate('itemId', 'name composition category unit hsnCode storeType')
-      .populate('batchId', 'batchNo expiryDate mrp purchaseRate')
+      .populate({ path: 'batchId', select: 'batchNo expiryDate mrp purchaseRate supplierId', populate: { path: 'supplierId', select: 'name phone address' } })
       .populate('referenceBillId', 'billNo billDate totalAmount')
       .lean();
 

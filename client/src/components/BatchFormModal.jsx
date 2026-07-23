@@ -3,6 +3,7 @@ import { Dialog, DialogFooter } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
+import { SupplierAutocomplete } from '@/components/SupplierAutocomplete';
 
 export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initialData = null, isLoading = false }) {
   const [formData, setFormData] = useState({
@@ -13,6 +14,7 @@ export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initial
     purchaseRate: 0,
     mrp: 0,
     gstPercent: 12,
+    supplierName: '',
   });
 
   const [errors, setErrors] = useState({});
@@ -34,6 +36,7 @@ export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initial
         purchaseRate: initialData.purchaseRate !== undefined ? initialData.purchaseRate : 0,
         mrp: initialData.mrp !== undefined ? initialData.mrp : 0,
         gstPercent: initialData.gstPercent !== undefined ? initialData.gstPercent : 12,
+        supplierName: initialData.supplierId?.name || initialData.supplierName || '',
       });
     } else {
       setFormData({
@@ -44,6 +47,7 @@ export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initial
         purchaseRate: 0,
         mrp: 0,
         gstPercent: 12,
+        supplierName: '',
       });
     }
     setErrors({});
@@ -95,6 +99,7 @@ export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initial
       purchaseRate: Number(formData.purchaseRate) || 0,
       mrp: Number(formData.mrp) || 0,
       gstPercent: Number(formData.gstPercent) || 0,
+      supplierName: formData.supplierName ? formData.supplierName.trim() : '',
     });
   };
 
@@ -108,6 +113,17 @@ export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initial
       description="Enter batch stock details, rates, and expiry date."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <Label htmlFor="supplierName">Supplier (Optional)</Label>
+          <SupplierAutocomplete
+            id="supplierName"
+            value={formData.supplierName}
+            onChange={(val) => setFormData((prev) => ({ ...prev, supplierName: val }))}
+            placeholder="e.g. Cipla Pharma Distributors"
+            className="mt-1"
+          />
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="batchNo">

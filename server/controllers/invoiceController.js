@@ -1,5 +1,6 @@
 const vision = require('@google-cloud/vision');
 const { parseInvoiceText } = require('../services/invoiceParser');
+const { findOrCreateSupplier } = require('../services/supplierService');
 const Item = require('../models/Item');
 const Batch = require('../models/Batch');
 const Invoice = require('../models/Invoice');
@@ -84,6 +85,11 @@ const confirmInvoice = async (req, res, next) => {
     let totalInvoiceAmount = 0;
     const invoiceItemsPayload = [];
 
+    let supplierRecord = null;
+    if (supplierName && supplierName.trim()) {
+      supplierRecord = await findOrCreateSupplier({ name: supplierName.trim() });
+    }
+
     for (const lineItem of items) {
       const { name, composition, category, unit, hsnCode, batchNo, expiryDate, qty, purchaseRate, mrp, gstPercent } = lineItem;
 
@@ -126,6 +132,7 @@ const confirmInvoice = async (req, res, next) => {
       // Create Batch
       const batch = await Batch.create({
         itemId: item._id,
+        supplierId: supplierRecord ? supplierRecord._id : undefined,
         batchNo: batchNo.trim(),
         expiryDate: new Date(expiryDate),
         qty: numQty,

@@ -24,6 +24,7 @@ import { Dialog } from '@/components/ui/Dialog';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/Table';
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
 import { PrintableReturn } from '@/components/PrintableReturn';
+import { SupplierAutocomplete } from '@/components/SupplierAutocomplete';
 
 export function ExpiryAlerts() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -101,7 +102,7 @@ export function ExpiryAlerts() {
   const handleOpenReturnModal = (batch) => {
     setBatchToReturn(batch);
     setReturnQty(batch.qty || 1);
-    setSupplierName('');
+    setSupplierName(batch.supplierId?.name || '');
     setReturnReason('expired');
     setCreditNoteNo('');
     setReturnDate(new Date().toISOString().split('T')[0]);
@@ -406,11 +407,11 @@ export function ExpiryAlerts() {
 
             <div>
               <Label htmlFor="supplierName">Supplier Name</Label>
-              <Input
+              <SupplierAutocomplete
                 id="supplierName"
                 placeholder="e.g. Cipla Pharma Distributors"
                 value={supplierName}
-                onChange={(e) => setSupplierName(e.target.value)}
+                onChange={(val) => setSupplierName(val)}
                 required
               />
             </div>

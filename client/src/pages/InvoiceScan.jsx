@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
+import { SupplierAutocomplete } from '@/components/SupplierAutocomplete';
 import { Badge } from '@/components/ui/Badge';
 
 export function InvoiceScan() {
@@ -344,10 +345,10 @@ export function InvoiceScan() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <Label htmlFor="supplierName">Supplier / Distributor Name</Label>
-                  <Input
+                  <SupplierAutocomplete
                     id="supplierName"
                     value={supplierName}
-                    onChange={(e) => setSupplierName(e.target.value)}
+                    onChange={(val) => setSupplierName(val)}
                     placeholder="e.g. Apex Pharma Agency"
                     className="mt-1"
                   />

@@ -10,7 +10,9 @@ const Item = require('../models/Item.js');
 const Batch = require('../models/Batch.js');
 const Bill = require('../models/Bill.js');
 const Return = require('../models/Return.js');
+const Supplier = require('../models/Supplier.js');
 const { computeBatchStatus } = require('../utils/batchStatus.js');
+const { findOrCreateSupplier } = require('../services/supplierService.js');
 
 const seedData = async () => {
   try {
@@ -19,11 +21,12 @@ const seedData = async () => {
 
     const resetMode = process.argv.includes('--reset');
     if (resetMode) {
-      console.log('[Seed] Reset flag detected. Clearing Item, Batch, Bill, and Return collections...');
+      console.log('[Seed] Reset flag detected. Clearing Item, Batch, Bill, Return, and Supplier collections...');
       await Item.deleteMany({});
       await Batch.deleteMany({});
       await Bill.deleteMany({});
       await Return.deleteMany({});
+      await Supplier.deleteMany({});
       console.log('[Seed] Existing transactional & inventory data cleared cleanly.');
     }
 
@@ -32,6 +35,14 @@ const seedData = async () => {
     // Helper to generate dates relative to today
     const daysAgo = (d) => new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
     const daysAhead = (d) => new Date(now.getTime() + d * 24 * 60 * 60 * 1000);
+
+    // ==========================================
+    // 0. SEED SUPPLIERS
+    // ==========================================
+    console.log('[Seed] Creating sample Suppliers...');
+    const sup1 = await findOrCreateSupplier({ name: 'Cipla Pharma Distributors', phone: '9825011223', address: 'Station Road, Bharuch' });
+    const sup2 = await findOrCreateSupplier({ name: 'Sun Pharma Agencies', phone: '9898033445', address: 'GIDC Industrial Estate, Ankleshwar' });
+    const sup3 = await findOrCreateSupplier({ name: 'Apex Medical Supplies', phone: '9712055667', address: 'Main Bazaar, Jambusar' });
 
     // ==========================================
     // 1. MEDICAL STORE ITEMS & BATCHES (~18 items)
@@ -76,62 +87,62 @@ const seedData = async () => {
 
     const medicalBatchesSeed = [
       // Dolo 650 (Normal + Expiring soon)
-      { itemId: createdMedicalItems[0]._id, batchNo: 'DL-2401', mfgDate: daysAgo(300), expiryDate: daysAhead(400), qty: 120, purchaseRate: 24.5, mrp: 34.0, gstPercent: 12 },
-      { itemId: createdMedicalItems[0]._id, batchNo: 'DL-2309', mfgDate: daysAgo(360), expiryDate: daysAhead(14), qty: 25, purchaseRate: 22.0, mrp: 32.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[0]._id, supplierId: sup1._id, batchNo: 'DL-2401', mfgDate: daysAgo(300), expiryDate: daysAhead(400), qty: 120, purchaseRate: 24.5, mrp: 34.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[0]._id, supplierId: sup1._id, batchNo: 'DL-2309', mfgDate: daysAgo(360), expiryDate: daysAhead(14), qty: 25, purchaseRate: 22.0, mrp: 32.0, gstPercent: 12 },
 
       // Crocin 650 (Normal)
-      { itemId: createdMedicalItems[1]._id, batchNo: 'CR-9081', mfgDate: daysAgo(200), expiryDate: daysAhead(300), qty: 95, purchaseRate: 26.0, mrp: 35.5, gstPercent: 12 },
+      { itemId: createdMedicalItems[1]._id, supplierId: sup2._id, batchNo: 'CR-9081', mfgDate: daysAgo(200), expiryDate: daysAhead(300), qty: 95, purchaseRate: 26.0, mrp: 35.5, gstPercent: 12 },
 
       // Calpol 650 (Expired + Normal)
-      { itemId: createdMedicalItems[2]._id, batchNo: 'CP-1102', mfgDate: daysAgo(500), expiryDate: daysAgo(40), qty: 40, purchaseRate: 21.0, mrp: 30.0, gstPercent: 12 },
-      { itemId: createdMedicalItems[2]._id, batchNo: 'CP-1405', mfgDate: daysAgo(120), expiryDate: daysAhead(500), qty: 110, purchaseRate: 23.0, mrp: 33.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[2]._id, supplierId: sup1._id, batchNo: 'CP-1102', mfgDate: daysAgo(500), expiryDate: daysAgo(40), qty: 40, purchaseRate: 21.0, mrp: 30.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[2]._id, supplierId: sup1._id, batchNo: 'CP-1405', mfgDate: daysAgo(120), expiryDate: daysAhead(500), qty: 110, purchaseRate: 23.0, mrp: 33.0, gstPercent: 12 },
 
       // Pacimol 650
-      { itemId: createdMedicalItems[3]._id, batchNo: 'PC-7712', mfgDate: daysAgo(180), expiryDate: daysAhead(320), qty: 60, purchaseRate: 20.0, mrp: 28.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[3]._id, supplierId: sup3._id, batchNo: 'PC-7712', mfgDate: daysAgo(180), expiryDate: daysAhead(320), qty: 60, purchaseRate: 20.0, mrp: 28.0, gstPercent: 12 },
 
       // Azee 500 (Normal + Expiring soon)
-      { itemId: createdMedicalItems[4]._id, batchNo: 'AZ-4011', mfgDate: daysAgo(150), expiryDate: daysAhead(350), qty: 85, purchaseRate: 95.0, mrp: 120.0, gstPercent: 12 },
-      { itemId: createdMedicalItems[4]._id, batchNo: 'AZ-3088', mfgDate: daysAgo(340), expiryDate: daysAhead(22), qty: 18, purchaseRate: 90.0, mrp: 115.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[4]._id, supplierId: sup1._id, batchNo: 'AZ-4011', mfgDate: daysAgo(150), expiryDate: daysAhead(350), qty: 85, purchaseRate: 95.0, mrp: 120.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[4]._id, supplierId: sup1._id, batchNo: 'AZ-3088', mfgDate: daysAgo(340), expiryDate: daysAhead(22), qty: 18, purchaseRate: 90.0, mrp: 115.0, gstPercent: 12 },
 
       // Azithral 500
-      { itemId: createdMedicalItems[5]._id, batchNo: 'AZT-992', mfgDate: daysAgo(100), expiryDate: daysAhead(450), qty: 70, purchaseRate: 98.0, mrp: 125.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[5]._id, supplierId: sup2._id, batchNo: 'AZT-992', mfgDate: daysAgo(100), expiryDate: daysAhead(450), qty: 70, purchaseRate: 98.0, mrp: 125.0, gstPercent: 12 },
 
       // Zady 500
-      { itemId: createdMedicalItems[6]._id, batchNo: 'ZD-501', mfgDate: daysAgo(90), expiryDate: daysAhead(280), qty: 50, purchaseRate: 60.0, mrp: 78.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[6]._id, supplierId: sup3._id, batchNo: 'ZD-501', mfgDate: daysAgo(90), expiryDate: daysAhead(280), qty: 50, purchaseRate: 60.0, mrp: 78.0, gstPercent: 12 },
 
       // Augmentin 625 Duo (Normal)
-      { itemId: createdMedicalItems[7]._id, batchNo: 'AUG-881', mfgDate: daysAgo(80), expiryDate: daysAhead(380), qty: 65, purchaseRate: 150.0, mrp: 205.0, gstPercent: 18 },
+      { itemId: createdMedicalItems[7]._id, supplierId: sup3._id, batchNo: 'AUG-881', mfgDate: daysAgo(80), expiryDate: daysAhead(380), qty: 65, purchaseRate: 150.0, mrp: 205.0, gstPercent: 18 },
 
       // Moxikind-CV 625 (Normal)
-      { itemId: createdMedicalItems[8]._id, batchNo: 'MX-1029', mfgDate: daysAgo(110), expiryDate: daysAhead(300), qty: 80, purchaseRate: 130.0, mrp: 175.0, gstPercent: 18 },
+      { itemId: createdMedicalItems[8]._id, supplierId: sup2._id, batchNo: 'MX-1029', mfgDate: daysAgo(110), expiryDate: daysAhead(300), qty: 80, purchaseRate: 130.0, mrp: 175.0, gstPercent: 18 },
 
       // Pan 40 (Expired + Normal)
-      { itemId: createdMedicalItems[9]._id, batchNo: 'PN-0021', mfgDate: daysAgo(480), expiryDate: daysAgo(25), qty: 35, purchaseRate: 110.0, mrp: 155.0, gstPercent: 12 },
-      { itemId: createdMedicalItems[9]._id, batchNo: 'PN-1102', mfgDate: daysAgo(60), expiryDate: daysAhead(420), qty: 140, purchaseRate: 115.0, mrp: 160.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[9]._id, supplierId: sup2._id, batchNo: 'PN-0021', mfgDate: daysAgo(480), expiryDate: daysAgo(25), qty: 35, purchaseRate: 110.0, mrp: 155.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[9]._id, supplierId: sup2._id, batchNo: 'PN-1102', mfgDate: daysAgo(60), expiryDate: daysAhead(420), qty: 140, purchaseRate: 115.0, mrp: 160.0, gstPercent: 12 },
 
       // Pantocid 40
-      { itemId: createdMedicalItems[10]._id, batchNo: 'PNC-701', mfgDate: daysAgo(140), expiryDate: daysAhead(260), qty: 90, purchaseRate: 120.0, mrp: 165.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[10]._id, supplierId: sup3._id, batchNo: 'PNC-701', mfgDate: daysAgo(140), expiryDate: daysAhead(260), qty: 90, purchaseRate: 120.0, mrp: 165.0, gstPercent: 12 },
 
       // Cetzine 10mg
-      { itemId: createdMedicalItems[11]._id, batchNo: 'CT-3301', mfgDate: daysAgo(210), expiryDate: daysAhead(180), qty: 150, purchaseRate: 18.0, mrp: 26.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[11]._id, supplierId: sup1._id, batchNo: 'CT-3301', mfgDate: daysAgo(210), expiryDate: daysAhead(180), qty: 150, purchaseRate: 18.0, mrp: 26.0, gstPercent: 12 },
 
       // Okacet 10mg
-      { itemId: createdMedicalItems[12]._id, batchNo: 'OK-9011', mfgDate: daysAgo(190), expiryDate: daysAhead(210), qty: 110, purchaseRate: 16.5, mrp: 24.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[12]._id, supplierId: sup2._id, batchNo: 'OK-9011', mfgDate: daysAgo(190), expiryDate: daysAhead(210), qty: 110, purchaseRate: 16.5, mrp: 24.0, gstPercent: 12 },
 
       // Glycomet 500
-      { itemId: createdMedicalItems[13]._id, batchNo: 'GL-8812', mfgDate: daysAgo(130), expiryDate: daysAhead(360), qty: 130, purchaseRate: 28.0, mrp: 42.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[13]._id, supplierId: sup3._id, batchNo: 'GL-8812', mfgDate: daysAgo(130), expiryDate: daysAhead(360), qty: 130, purchaseRate: 28.0, mrp: 42.0, gstPercent: 12 },
 
       // Atorva 10 (Expiring Soon)
-      { itemId: createdMedicalItems[14]._id, batchNo: 'ATV-441', mfgDate: daysAgo(350), expiryDate: daysAhead(8), qty: 22, purchaseRate: 65.0, mrp: 92.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[14]._id, supplierId: sup1._id, batchNo: 'ATV-441', mfgDate: daysAgo(350), expiryDate: daysAhead(8), qty: 22, purchaseRate: 65.0, mrp: 92.0, gstPercent: 12 },
 
       // Telma 40
-      { itemId: createdMedicalItems[15]._id, batchNo: 'TL-1092', mfgDate: daysAgo(95), expiryDate: daysAhead(400), qty: 85, purchaseRate: 72.0, mrp: 108.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[15]._id, supplierId: sup2._id, batchNo: 'TL-1092', mfgDate: daysAgo(95), expiryDate: daysAhead(400), qty: 85, purchaseRate: 72.0, mrp: 108.0, gstPercent: 12 },
 
       // Benadryl Syrup
-      { itemId: createdMedicalItems[16]._id, batchNo: 'BND-661', mfgDate: daysAgo(160), expiryDate: daysAhead(220), qty: 45, purchaseRate: 85.0, mrp: 118.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[16]._id, supplierId: sup1._id, batchNo: 'BND-661', mfgDate: daysAgo(160), expiryDate: daysAhead(220), qty: 45, purchaseRate: 85.0, mrp: 118.0, gstPercent: 12 },
 
       // Monocef 1g Injection
-      { itemId: createdMedicalItems[17]._id, batchNo: 'MN-5501', mfgDate: daysAgo(70), expiryDate: daysAhead(480), qty: 40, purchaseRate: 48.0, mrp: 68.0, gstPercent: 12 },
+      { itemId: createdMedicalItems[17]._id, supplierId: sup3._id, batchNo: 'MN-5501', mfgDate: daysAgo(70), expiryDate: daysAhead(480), qty: 40, purchaseRate: 48.0, mrp: 68.0, gstPercent: 12 },
     ];
 
     const medicalBatchesWithStatus = medicalBatchesSeed.map((b) => ({
@@ -275,7 +286,7 @@ const seedData = async () => {
         reason: 'expired',
         returnDate: daysAgo(2),
         restocked: false,
-        supplierName: 'Cipla Pharma Distributors',
+        supplierName: sup1.name,
         creditNoteNo: 'CN-2026-8812',
         notes: 'Returned expired stock for credit note adjustment.',
       },
@@ -310,11 +321,12 @@ const seedData = async () => {
     const totalBatchesCount = (await Batch.countDocuments());
     const totalBillsCount = (await Bill.countDocuments());
     const totalReturnsCount = (await Return.countDocuments());
+    const totalSuppliersCount = (await Supplier.countDocuments());
 
     console.log('\n=================================================');
     console.log('  SATKAR MEDICAL PMS — MOCK DATA SEED COMPLETE   ');
     console.log('=================================================');
-    console.log(`Seeded: ${totalItemsCount} items, ${totalBatchesCount} batches, ${totalBillsCount} bills, ${totalReturnsCount} returns. Done.`);
+    console.log(`Seeded: ${totalItemsCount} items, ${totalBatchesCount} batches, ${totalBillsCount} bills, ${totalReturnsCount} returns, ${totalSuppliersCount} suppliers. Done.`);
     console.log('=================================================\n');
 
     await mongoose.disconnect();
