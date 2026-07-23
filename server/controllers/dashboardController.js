@@ -1,5 +1,6 @@
 const Item = require('../models/Item');
 const Batch = require('../models/Batch');
+const Bill = require('../models/Bill');
 
 // @desc    Get dashboard summary statistics
 // @route   GET /api/dashboard/summary
@@ -20,10 +21,22 @@ const getDashboardSummary = async (req, res, next) => {
       if (b.status === 'expired') expiredCount++;
     });
 
+    // Today's Sales Calculation
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const todayBills = await Bill.find({
+      billDate: { $gte: startOfDay, $lte: endOfDay },
+    }).select('totalAmount').lean();
+
+    const todaySales = todayBills.reduce((acc, bill) => acc + (bill.totalAmount || 0), 0);
+
     return res.status(200).json({
       totalItems,
       totalBatchQty,
-      todaySales: 0, // Phase 6 will populate today's sales from Bill collection
+      todaySales: Math.round(todaySales * 100) / 100,
       expiringSoonCount,
       expiredCount,
     });
