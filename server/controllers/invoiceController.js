@@ -3,6 +3,7 @@ const { parseInvoiceText } = require('../services/invoiceParser');
 const Item = require('../models/Item');
 const Batch = require('../models/Batch');
 const Invoice = require('../models/Invoice');
+const { computeBatchStatus } = require('../utils/batchStatus');
 
 // Instantiate Google Vision Client (automatically uses GOOGLE_APPLICATION_CREDENTIALS)
 let visionClient = null;
@@ -11,22 +12,6 @@ try {
 } catch (err) {
   console.warn('[Vision API Warning] ImageAnnotatorClient initialization deferred:', err.message);
 }
-
-// Helper to calculate batch status
-const computeBatchStatus = (expiryDate) => {
-  if (!expiryDate) return 'active';
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const exp = new Date(expiryDate);
-  exp.setHours(0, 0, 0, 0);
-
-  const diffTime = exp - now;
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays < 0) return 'expired';
-  if (diffDays <= 30) return 'expiring_soon';
-  return 'active';
-};
 
 // @desc    Scan invoice image using Google Vision OCR
 // @route   POST /api/invoices/scan

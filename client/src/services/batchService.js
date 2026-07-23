@@ -5,6 +5,16 @@ export const getBatches = async (itemId) => {
   return response.data;
 };
 
+export const getExpiringSoon = async (params = {}) => {
+  const response = await api.get('/batches/expiring-soon', { params });
+  return response.data;
+};
+
+export const getExpired = async (params = {}) => {
+  const response = await api.get('/batches/expired', { params });
+  return response.data;
+};
+
 export const createBatch = async (batchData) => {
   const response = await api.post('/batches', batchData);
   return response.data;

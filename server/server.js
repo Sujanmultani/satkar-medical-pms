@@ -6,12 +6,16 @@ const authRoutes = require('./routes/authRoutes.js');
 const itemRoutes = require('./routes/itemRoutes.js');
 const batchRoutes = require('./routes/batchRoutes.js');
 const invoiceRoutes = require('./routes/invoiceRoutes.js');
+const dashboardRoutes = require('./routes/dashboardRoutes.js');
+const { startExpiryCron } = require('./jobs/expiryStatusJob.js');
 const { errorHandler, notFound } = require('./middleware/errorMiddleware.js');
 
 dotenv.config();
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB & start background jobs
+connectDB().then(() => {
+  startExpiryCron();
+});
 
 const app = express();
 
@@ -27,6 +31,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/items', itemRoutes);
 app.use('/api/batches', batchRoutes);
 app.use('/api/invoices', invoiceRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

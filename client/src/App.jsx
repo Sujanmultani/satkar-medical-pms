@@ -6,6 +6,7 @@ import { Dashboard } from '@/pages/Dashboard';
 import { StockList } from '@/pages/StockList';
 import { ProvisionStore } from '@/pages/ProvisionStore';
 import { InvoiceScan } from '@/pages/InvoiceScan';
+import { ExpiryAlerts } from '@/pages/ExpiryAlerts';
 import { Sidebar } from '@/components/Sidebar';
 
 // Protected Route Wrapper
@@ -28,6 +29,7 @@ function ProtectedLayout() {
           <Route path="/provision" element={<ProvisionStore />} />
           <Route path="/provision-store" element={<ProvisionStore />} />
           <Route path="/invoice-scan" element={<InvoiceScan />} />
+          <Route path="/expiry-alerts" element={<ExpiryAlerts />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>

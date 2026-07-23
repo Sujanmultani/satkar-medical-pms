@@ -25,7 +25,7 @@ export function Sidebar() {
     { label: 'Provision Store', path: '/provision', icon: ShoppingBag, disabled: false },
     { label: 'Invoice Scan', path: '/invoice-scan', icon: ScanLine, disabled: false },
     { label: 'Billing', path: '/billing', icon: Receipt, disabled: true },
-    { label: 'Expiry Alerts', path: '/expiry-alerts', icon: AlertTriangle, disabled: true },
+    { label: 'Expiry Alerts', path: '/expiry-alerts', icon: AlertTriangle, disabled: false },
     { label: 'Settings', path: '/settings', icon: Settings, disabled: true },
   ];
 

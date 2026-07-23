@@ -1,21 +1,6 @@
 const Item = require('../models/Item');
 const Batch = require('../models/Batch');
-
-// Helper to compute batch status dynamically
-const computeBatchStatus = (expiryDate) => {
-  if (!expiryDate) return 'active';
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const exp = new Date(expiryDate);
-  exp.setHours(0, 0, 0, 0);
-  
-  const diffTime = exp - now;
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
-  if (diffDays < 0) return 'expired';
-  if (diffDays <= 30) return 'expiring_soon';
-  return 'active';
-};
+const { computeBatchStatus } = require('../utils/batchStatus');
 
 // @desc    Create new item
 // @route   POST /api/items

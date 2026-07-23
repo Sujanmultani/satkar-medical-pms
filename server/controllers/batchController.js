@@ -1,21 +1,6 @@
 const Batch = require('../models/Batch');
 const Item = require('../models/Item');
-
-// Helper to compute status
-const computeBatchStatus = (expiryDate) => {
-  if (!expiryDate) return 'active';
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const exp = new Date(expiryDate);
-  exp.setHours(0, 0, 0, 0);
-
-  const diffTime = exp - now;
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays < 0) return 'expired';
-  if (diffDays <= 30) return 'expiring_soon';
-  return 'active';
-};
+const { computeBatchStatus } = require('../utils/batchStatus');
 
 // @desc    Create batch for an item
 // @route   POST /api/batches
@@ -155,9 +140,59 @@ const deleteBatch = async (req, res, next) => {
   }
 };
 
+// Helper for status-filtered batch queries (expiring_soon / expired)
+const getBatchesByStatus = async (req, res, next, targetStatus) => {
+  try {
+    const { storeType } = req.query;
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
+    const skip = (page - 1) * limit;
+
+    const batchFilter = { status: targetStatus };
+
+    if (storeType && ['medical', 'provision'].includes(storeType)) {
+      const items = await Item.find({ storeType }).select('_id').lean();
+      const itemIds = items.map((i) => i._id);
+      batchFilter.itemId = { $in: itemIds };
+    }
+
+    const total = await Batch.countDocuments(batchFilter);
+    const batches = await Batch.find(batchFilter)
+      .populate('itemId', 'name composition category unit hsnCode storeType')
+      .sort({ expiryDate: 1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    return res.status(200).json({
+      data: batches,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit) || 1,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get expiring soon batches (status: expiring_soon)
+// @route   GET /api/batches/expiring-soon
+// @access  Private
+const getExpiringSoonBatches = (req, res, next) => getBatchesByStatus(req, res, next, 'expiring_soon');
+
+// @desc    Get expired batches (status: expired)
+// @route   GET /api/batches/expired
+// @access  Private
+const getExpiredBatches = (req, res, next) => getBatchesByStatus(req, res, next, 'expired');
+
 module.exports = {
   createBatch,
   getBatches,
   updateBatch,
   deleteBatch,
+  getExpiringSoonBatches,
+  getExpiredBatches,
 };
