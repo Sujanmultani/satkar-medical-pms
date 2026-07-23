@@ -9,6 +9,7 @@ const invoiceRoutes = require('./routes/invoiceRoutes.js');
 const dashboardRoutes = require('./routes/dashboardRoutes.js');
 const billRoutes = require('./routes/billRoutes.js');
 const settingsRoutes = require('./routes/settingsRoutes.js');
+const returnRoutes = require('./routes/returnRoutes.js');
 const { startExpiryCron } = require('./jobs/expiryStatusJob.js');
 const { errorHandler, notFound } = require('./middleware/errorMiddleware.js');
 
@@ -36,6 +37,7 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/bills', billRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/returns', returnRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

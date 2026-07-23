@@ -32,11 +32,14 @@
   }
 
   #printable-bill-area,
-  #printable-bill-area * {
+  #printable-bill-area *,
+  #printable-return-area,
+  #printable-return-area * {
     visibility: visible !important;
   }
 
-  #printable-bill-area {
+  #printable-bill-area,
+  #printable-return-area {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;

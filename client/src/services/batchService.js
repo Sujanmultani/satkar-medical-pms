@@ -5,6 +5,8 @@ export const getBatches = async (itemId) => {
   return response.data;
 };
 
+export const getBatchesByItem = getBatches;
+
 export const getExpiringSoon = async (params = {}) => {
   const response = await api.get('/batches/expiring-soon', { params });
   return response.data;
@@ -28,4 +30,14 @@ export const updateBatch = async (id, batchData) => {
 export const deleteBatch = async (id) => {
   const response = await api.delete(`/batches/${id}`);
   return response.data;
+};
+
+export default {
+  getBatches,
+  getBatchesByItem,
+  getExpiringSoon,
+  getExpired,
+  createBatch,
+  updateBatch,
+  deleteBatch,
 };

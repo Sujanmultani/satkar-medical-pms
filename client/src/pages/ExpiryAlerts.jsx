@@ -8,16 +8,22 @@ import {
   CheckCircle2, 
   Layers, 
   Calendar,
-  Filter
+  Filter,
+  Undo2
 } from 'lucide-react';
 import { getExpiringSoon, getExpired, deleteBatch } from '@/services/batchService';
+import { createReturn } from '@/services/returnService';
 import { LogoWatermark } from '@/components/LogoWatermark';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Select } from '@/components/ui/Select';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
+import { Dialog } from '@/components/ui/Dialog';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/Table';
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
+import { PrintableReturn } from '@/components/PrintableReturn';
 
 export function ExpiryAlerts() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -35,6 +41,21 @@ export function ExpiryAlerts() {
   const [batchToDelete, setBatchToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Supplier Return modal state
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [batchToReturn, setBatchToReturn] = useState(null);
+  const [supplierName, setSupplierName] = useState('');
+  const [returnQty, setReturnQty] = useState(1);
+  const [returnReason, setReturnReason] = useState('expired');
+  const [creditNoteNo, setCreditNoteNo] = useState('');
+  const [returnDate, setReturnDate] = useState(new Date().toISOString().split('T')[0]);
+  const [notes, setNotes] = useState('');
+  const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
+
+  // Print slip state
+  const [createdReturnRecord, setCreatedReturnRecord] = useState(null);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+
   const fetchAlerts = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -46,7 +67,7 @@ export function ExpiryAlerts() {
       setBatches(res.data || []);
     } catch (err) {
       console.error('Failed to load expiry alerts:', err);
-      setError(err.response?.data?.error?.message || 'Failed to fetch batch data from server.');
+      setError('Failed to load expiry records. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -58,7 +79,7 @@ export function ExpiryAlerts() {
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
-    setSearchParams({ tab: tab === 'expired' ? 'expired' : 'expiring' });
+    setSearchParams({ tab });
   };
 
   const handleConfirmDelete = async () => {
@@ -70,10 +91,64 @@ export function ExpiryAlerts() {
       setBatchToDelete(null);
       fetchAlerts();
     } catch (err) {
-      console.error('Failed to delete expired batch:', err);
-      alert(err.response?.data?.error?.message || 'Failed to delete batch.');
+      console.error('Failed to delete batch:', err);
+      alert('Failed to dispose batch. Please try again.');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleOpenReturnModal = (batch) => {
+    setBatchToReturn(batch);
+    setReturnQty(batch.qty || 1);
+    setSupplierName('');
+    setReturnReason('expired');
+    setCreditNoteNo('');
+    setReturnDate(new Date().toISOString().split('T')[0]);
+    setNotes('');
+    setIsReturnModalOpen(true);
+  };
+
+  const handleConfirmSupplierReturn = async (e) => {
+    e.preventDefault();
+    if (!batchToReturn) return;
+
+    const numQty = Number(returnQty);
+    if (isNaN(numQty) || numQty < 1 || numQty > batchToReturn.qty) {
+      alert(`Return quantity must be between 1 and ${batchToReturn.qty}.`);
+      return;
+    }
+
+    setIsSubmittingReturn(true);
+    try {
+      const payload = {
+        type: 'supplier',
+        itemId: batchToReturn.itemId?._id || batchToReturn.itemId,
+        batchId: batchToReturn._id,
+        storeType: batchToReturn.itemId?.storeType || 'medical',
+        quantity: numQty,
+        reason: returnReason,
+        returnDate,
+        supplierName,
+        creditNoteNo,
+        notes,
+      };
+
+      const res = await createReturn(payload);
+      setIsReturnModalOpen(false);
+      setBatchToReturn(null);
+      fetchAlerts();
+
+      // Show printable slip
+      if (res.data) {
+        setCreatedReturnRecord(res.data);
+        setIsPrintModalOpen(true);
+      }
+    } catch (err) {
+      console.error('Failed to create supplier return:', err);
+      alert(err.response?.data?.error?.message || 'Failed to record supplier return.');
+    } finally {
+      setIsSubmittingReturn(false);
     }
   };
 
@@ -94,87 +169,85 @@ export function ExpiryAlerts() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-heading font-bold text-primary flex items-center gap-2">
-              <AlertTriangle className="w-6 h-6 text-amber-500" />
-              <span>Expiry Alerts & Management</span>
+              <AlertTriangle className="w-6 h-6 text-warning" />
+              <span>Expiry Management Alerts</span>
             </h1>
             <p className="text-xs text-muted mt-1">
-              Track stock expiring in the next 30 days and manage expired inventory disposal.
+              Track expiring batches and record supplier returns or dispossals for expired medicine stock.
             </p>
           </div>
 
-          {/* Store Filter Selector */}
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <Filter className="w-4 h-4 text-muted shrink-0" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchAlerts}
+            disabled={loading}
+            className="gap-2 self-start sm:self-auto"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh Alerts</span>
+          </Button>
+        </div>
+
+        {/* Tab & Filter Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/80 p-3 rounded-2xl border border-gray-200 shadow-sm backdrop-blur-sm">
+          {/* Tabs */}
+          <div className="flex items-center gap-1.5 p-1 bg-gray-100/80 rounded-xl">
+            <button
+              onClick={() => handleTabChange('expiring')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'expiring'
+                  ? 'bg-amber-500 text-white shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>Expiring Soon (30 Days)</span>
+            </button>
+
+            <button
+              onClick={() => handleTabChange('expired')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'expired'
+                  ? 'bg-red-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+              }`}
+            >
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>Already Expired</span>
+            </button>
+          </div>
+
+          {/* Store Filter */}
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <Filter className="w-3.5 h-3.5 text-muted" />
             <Select
               value={storeType}
               onChange={(e) => setStoreType(e.target.value)}
-              className="w-44 text-xs bg-white font-medium"
+              className="w-40 text-xs py-1.5"
             >
-              <option value="all">All Store Items</option>
-              <option value="medical">Medical Store</option>
+              <option value="all">All Stores</option>
+              <option value="medical">Pharmacy Only</option>
               <option value="provision">Provision Store</option>
             </Select>
-
-            <button
-              onClick={fetchAlerts}
-              className="p-2 rounded-lg bg-white border border-gray-200 text-gray-500 hover:text-primary transition-colors"
-              title="Refresh Alerts"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            </button>
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex border-b border-gray-200 gap-2">
-          <button
-            onClick={() => handleTabChange('expiring')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${
-              activeTab === 'expiring'
-                ? 'border-amber-500 text-amber-800 bg-amber-50/40 rounded-t-xl'
-                : 'border-transparent text-gray-500 hover:text-primary'
-            }`}
-          >
-            <Clock className="w-4 h-4 text-amber-600" />
-            <span>Expiring Soon (Next 30 Days)</span>
-          </button>
-
-          <button
-            onClick={() => handleTabChange('expired')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${
-              activeTab === 'expired'
-                ? 'border-red-500 text-red-800 bg-red-50/40 rounded-t-xl'
-                : 'border-transparent text-gray-500 hover:text-primary'
-            }`}
-          >
-            <AlertTriangle className="w-4 h-4 text-red-600" />
-            <span>Already Expired</span>
-          </button>
-        </div>
-
-        {/* 4-STATE PATTERN */}
-
         {/* STATE 1: LOADING */}
         {loading && (
-          <Card className="p-12 text-center flex flex-col items-center justify-center gap-3">
-            <div className="w-10 h-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-            <p className="text-sm font-medium text-primary">Checking expiry statuses...</p>
+          <Card className="p-12 text-center flex flex-col items-center justify-center gap-3 bg-white/90">
+            <div className="w-8 h-8 border-4 border-secondary/30 border-t-secondary rounded-full animate-spin" />
+            <p className="text-xs text-muted font-medium">Checking batch expiration records...</p>
           </Card>
         )}
 
         {/* STATE 2: ERROR */}
-        {!loading && error && (
-          <Card className="p-8 border-error/30 bg-red-50/50 text-center flex flex-col items-center justify-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-red-100 text-error flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-error">Failed to Load Expiry Alerts</h3>
-              <p className="text-xs text-gray-600 mt-1">{error}</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={fetchAlerts} className="mt-2 gap-2">
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Retry</span>
+        {error && !loading && (
+          <Card className="p-8 text-center flex flex-col items-center justify-center gap-3 bg-red-50/80 border-red-200">
+            <AlertTriangle className="w-8 h-8 text-error" />
+            <p className="text-sm font-semibold text-error">{error}</p>
+            <Button variant="outline" size="sm" onClick={fetchAlerts}>
+              Try Again
             </Button>
           </Card>
         )}
@@ -182,31 +255,19 @@ export function ExpiryAlerts() {
         {/* STATE 3: EMPTY */}
         {!loading && !error && batches.length === 0 && (
           <Card className="p-12 text-center flex flex-col items-center justify-center gap-3 bg-white/90">
-            {activeTab === 'expiring' ? (
-              <>
-                <div className="w-12 h-12 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center">
-                  <CheckCircle2 className="w-7 h-7" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-teal-800">All Stock is Fresh!</h3>
-                  <p className="text-xs text-muted mt-1 max-w-sm">
-                    No items or batches are set to expire in the next 30 days.
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="w-12 h-12 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center">
-                  <CheckCircle2 className="w-7 h-7" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-teal-800">No Expired Batches</h3>
-                  <p className="text-xs text-muted mt-1 max-w-sm">
-                    There are zero expired batches in your inventory.
-                  </p>
-                </div>
-              </>
-            )}
+            <div className="w-12 h-12 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center">
+              <CheckCircle2 className="w-7 h-7" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-teal-800">
+                {activeTab === 'expiring' ? 'All Stock is Fresh!' : 'No Expired Batches'}
+              </h3>
+              <p className="text-xs text-muted mt-1 max-w-sm">
+                {activeTab === 'expiring'
+                  ? 'No items or batches are set to expire in the next 30 days.'
+                  : 'There are zero expired batches in your inventory.'}
+              </p>
+            </div>
           </Card>
         )}
 
@@ -279,18 +340,30 @@ export function ExpiryAlerts() {
 
                     {isExpired && (
                       <TableCell className="text-right">
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => {
-                            setBatchToDelete(batch);
-                            setIsDeleteModalOpen(true);
-                          }}
-                          className="h-8 px-2.5 text-xs gap-1"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Dispose</span>
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenReturnModal(batch)}
+                            className="h-8 px-2.5 text-xs gap-1 border-amber-300 hover:bg-amber-50 text-amber-800"
+                          >
+                            <Undo2 className="w-3.5 h-3.5" />
+                            <span>Return to Supplier</span>
+                          </Button>
+
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => {
+                              setBatchToDelete(batch);
+                              setIsDeleteModalOpen(true);
+                            }}
+                            className="h-8 px-2.5 text-xs gap-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Dispose</span>
+                          </Button>
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
@@ -312,6 +385,120 @@ export function ExpiryAlerts() {
           title={`Dispose Expired Batch "${batchToDelete?.batchNo}"?`}
           message={`Are you sure you want to permanently delete batch "${batchToDelete?.batchNo}" (${batchToDelete?.itemId?.name})? This action removes expired stock from your system.`}
         />
+
+        {/* Supplier Return Modal */}
+        <Dialog
+          isOpen={isReturnModalOpen}
+          onClose={() => setIsReturnModalOpen(false)}
+          title={`Return Batch ${batchToReturn?.batchNo} to Supplier`}
+          description="Record supplier return to remove expired stock and issue a return slip."
+          className="max-w-md"
+        >
+          <form onSubmit={handleConfirmSupplierReturn} className="space-y-4 text-xs">
+            <div>
+              <Label htmlFor="itemDetails">Item & Batch Info</Label>
+              <div className="p-2.5 bg-slate-50 border rounded-lg space-y-1">
+                <p className="font-semibold text-primary">{batchToReturn?.itemId?.name}</p>
+                <p className="text-muted font-mono text-[11px]">Batch: {batchToReturn?.batchNo} | Exp: {formatDate(batchToReturn?.expiryDate)}</p>
+                <p className="text-muted font-mono text-[11px]">Available Stock Qty: <span className="font-bold text-primary">{batchToReturn?.qty}</span></p>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="supplierName">Supplier Name</Label>
+              <Input
+                id="supplierName"
+                placeholder="e.g. Cipla Pharma Distributors"
+                value={supplierName}
+                onChange={(e) => setSupplierName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="returnQty">Return Quantity</Label>
+                <Input
+                  id="returnQty"
+                  type="number"
+                  min="1"
+                  max={batchToReturn?.qty || 1}
+                  value={returnQty}
+                  onChange={(e) => setReturnQty(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="returnReason">Reason</Label>
+                <Select
+                  id="returnReason"
+                  value={returnReason}
+                  onChange={(e) => setReturnReason(e.target.value)}
+                  required
+                >
+                  <option value="expired">Expired Stock</option>
+                  <option value="damaged">Damaged Goods</option>
+                  <option value="other">Other Reason</option>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="creditNoteNo">Credit Note No (Optional)</Label>
+                <Input
+                  id="creditNoteNo"
+                  placeholder="e.g. CN-90812"
+                  value={creditNoteNo}
+                  onChange={(e) => setCreditNoteNo(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="returnDate">Return Date</Label>
+                <Input
+                  id="returnDate"
+                  type="date"
+                  value={returnDate}
+                  onChange={(e) => setReturnDate(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="notes">Notes / Remarks (Optional)</Label>
+              <Input
+                id="notes"
+                placeholder="e.g. Handed over to sales representative"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsReturnModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="default" size="sm" disabled={isSubmittingReturn}>
+                {isSubmittingReturn ? 'Processing...' : 'Confirm Supplier Return'}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
+
+        {/* Printable Return Slip Modal */}
+        {createdReturnRecord && (
+          <PrintableReturn
+            isOpen={isPrintModalOpen}
+            onClose={() => {
+              setIsPrintModalOpen(false);
+              setCreatedReturnRecord(null);
+            }}
+            returnRecord={createdReturnRecord}
+          />
+        )}
       </div>
     </div>
   );

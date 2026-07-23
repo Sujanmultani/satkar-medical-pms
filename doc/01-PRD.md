@@ -17,6 +17,7 @@ Satkar Medical currently manages stock via manual registers and paper invoices. 
 3. **Billing & GST** — generate GST-compliant bills with customizable date, print, and WhatsApp/SMS sharing.
 4. **Composition Search** — search by salt/content to find matching medicines and alternatives.
 5. **Provision Store Module** — same stock+billing capability, separate section, single login.
+6. **Returns Management** — record and print both (a) expired/damaged stock returned to the supplier, and (b) customer returns of previously sold medicine, each with a printed proof/slip.
 
 ## 5. OUT OF SCOPE for v1
 - NOT building: multi-staff/role-based logins, multi-branch inventory sync, native iOS/Android apps (PWA instead), accounting-software integration, real-time chat/support features, customer-facing ordering portal, loyalty/rewards programs.
@@ -28,6 +29,8 @@ Satkar Medical currently manages stock via manual registers and paper invoices. 
 - As the admin, I want to search a medicine's composition, so that I can suggest alternatives when a brand is out of stock.
 - As the admin, I want to manage my provision store in the same app, so that I don't need separate software.
 - As the admin, I want to access the app from my phone or PC from anywhere, so that I'm not tied to one machine.
+- As the admin, I want to record when I return expired stock to a supplier, so that I have proof of the return and my stock count stays accurate.
+- As the admin, I want to record when a customer returns a purchased medicine, so that I can track refunds/exchanges and print a slip for the customer.
 
 ## 7. Success criteria
 - A purchase invoice can be scanned and confirmed into stock in under 2 minutes.

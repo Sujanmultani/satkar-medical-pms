@@ -47,6 +47,31 @@ totalAmount      Number
 status           String enum['scanned','confirmed'], default 'scanned'
 createdAt/updatedAt   Date (timestamps)
 
+## COLLECTION: returns
+_id             ObjectId PK
+type            String enum['supplier','customer'], required
+itemId          ObjectId FK -> items._id, required
+batchId         ObjectId FK -> batches._id, required
+storeType       String enum['medical','provision'], required   -- denormalized from item for easy filtering
+quantity        Number, required, min 1
+reason          String enum['expired','damaged','customer_dissatisfaction','wrong_item','other'], required
+returnDate      Date, required
+returnNo        String, unique                                  -- auto-generated, e.g. RET-YYYYMMDD-XXXX
+restocked       Boolean, default false                          -- whether quantity was added back to sellable stock
+
+-- supplier-return-specific (present only when type='supplier')
+supplierName    String
+creditNoteNo    String                                           -- if supplier issues a credit note reference
+
+-- customer-return-specific (present only when type='customer')
+referenceBillId ObjectId FK -> bills._id, optional                -- links back to the original sale if known
+customerName    String
+customerPhone   String
+refundAmount    Number
+
+notes           String
+createdAt/updatedAt   Date (timestamps)
+
 ## COLLECTION: bills
 _id           ObjectId PK
 billNo        String, unique
@@ -74,6 +99,9 @@ bills:   index on { billDate }; unique index on { billNo }
 - **storeType** on Item is the single field separating Medical Store data from Provision Store data — both live in the same `items`/`batches` collections, filtered by this field. No separate collections.
 - Single-admin model in v1: no per-user data scoping needed yet (all data belongs to the one admin). This will need revisiting if multi-staff roles are added later.
 
+- A **Return** (type='supplier') records expired/damaged stock sent back to the supplier — reduces the Batch's `qty` (it's leaving the pharmacy for good), `restocked` is always `false` for this type.
+- A **Return** (type='customer') records a customer returning previously sold medicine — may optionally link to the original `Bill` via `referenceBillId`. If `restocked` is `true`, the Batch's `qty` is incremented back (item is resellable); if the reason is `expired` or `damaged`, `restocked` should be `false` (the item is not put back on the shelf).
+
 ## Part C — API Contract
 
 | Method | Endpoint | Auth | Returns |
@@ -94,6 +122,9 @@ bills:   index on { billDate }; unique index on { billNo }
 | POST | /api/bills | Yes | 201 {bill} |
 | POST | /api/bills/:id/share | Yes | 200 {shareStatus} — Phase 6.5 |
 | GET | /api/dashboard/summary | Yes | 200 {totalItems, todaySales, expiringSoon, expired} |
+| GET | /api/returns?type=&storeType= | Yes | 200 {data[]} |
+| POST | /api/returns | Yes | 201 {return} / 400 |
+| GET | /api/returns/:id | Yes | 200 {return} / 404 |
 
 ### Global API rules
 - Every error returns: `{ error: { code, message } }` — same shape, always.

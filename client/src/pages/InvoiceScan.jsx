@@ -229,9 +229,9 @@ export function InvoiceScan() {
 
       <div className="relative z-10 max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-heading font-bold text-primary flex items-center gap-2">
+        <div className={`flex flex-col sm:flex-row justify-between gap-4 ${step === 'upload' ? 'items-center text-center sm:text-left' : 'sm:items-center'}`}>
+          <div className={step === 'upload' ? 'text-center w-full' : ''}>
+            <h1 className={`text-2xl font-heading font-bold text-primary flex items-center gap-2 ${step === 'upload' ? 'justify-center' : ''}`}>
               <ScanLine className="w-6 h-6 text-secondary" />
               <span>Smart Invoice Scanner (OCR)</span>
             </h1>
@@ -259,16 +259,16 @@ export function InvoiceScan() {
 
         {/* STEP 1: UPLOAD ZONE */}
         {step === 'upload' && (
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-2xl mx-auto py-8">
             <Card
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
-              className={`p-10 text-center border-2 border-dashed cursor-pointer transition-all duration-200 ${
+              className={`p-10 md:p-14 text-center border-2 border-dashed cursor-pointer transition-all duration-200 bg-white/90 ${
                 isDragging
                   ? 'border-secondary bg-secondary/10 shadow-lg scale-[1.01]'
-                  : 'border-secondary/40 hover:border-secondary hover:bg-teal-50/30'
+                  : 'border-secondary/40 hover:border-secondary hover:bg-teal-50/30 shadow-card'
               }`}
             >
               <input
@@ -290,14 +290,11 @@ export function InvoiceScan() {
                 Supports JPG, PNG, WEBP, or PDF invoice scans up to 10MB
               </p>
 
-              <div className="mt-6 inline-flex items-center justify-center">
-                <span className="relative inline-flex overflow-hidden rounded-xl p-[1.5px] focus:outline-none focus:ring-2 focus:ring-secondary">
-                  <span className="absolute inset-[-1000%] animate-[spin_4s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#0B4C52_0%,#17878E_33%,#5CA627_66%,#0B4C52_100%)]" />
-                  <span className="inline-flex h-full w-full items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white gap-2 shadow-md">
-                    <FileText className="w-4 h-4 text-accent" />
-                    <span>Browse Image File</span>
-                  </span>
-                </span>
+              <div className="mt-6">
+                <Button variant="default" size="md" className="gap-2 px-6 shadow-md font-semibold pointer-events-none">
+                  <FileText className="w-4 h-4 text-accent" />
+                  <span>Select Image / PDF File</span>
+                </Button>
               </div>
             </Card>
           </div>

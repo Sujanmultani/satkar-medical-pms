@@ -101,3 +101,14 @@ Full restart — both **frontend and backend** are being rebuilt from scratch. T
 7.4 Custom domain (if client provides one)
 **Depends on**: All prior phases functionally complete
 **Done when**: App is installable on PC and mobile, reachable via a public URL, all features work in production.
+
+## PHASE 8 — Returns Management (added post-Phase-6, client request)
+**Goal**: Record and print both supplier returns (expired/damaged stock sent back) and customer returns (previously sold medicine returned), per `05-Backend-Schema.md`'s `returns` collection.
+**Build**:
+8.1 `Return` model + `POST/GET /api/returns` endpoints
+8.2 Supplier-return flow: accessible from the Expiry Alerts "Already Expired" tab as an alternative to plain delete — captures supplier name, quantity, reason, optional credit note number; decrements batch qty
+8.3 Customer-return flow: accessible from Bill History — select a bill, select item(s)/quantity to return, reason, refund amount; conditionally restocks batch qty (not restocked if reason is expired/damaged)
+8.4 Printable return slip/receipt (reuse the `PrintableBill.jsx` pattern and print CSS approach) for both return types
+8.5 A "Returns History" list screen (similar pattern to Bill History) showing both types, filterable
+**Depends on**: Phase 2 (Batch/Item), Phase 4 (Expiry Alerts UI), Phase 6 (Bill History UI, print CSS pattern)
+**Done when**: Both return types can be recorded, correctly adjust stock, and produce a printed slip; a Returns History screen lists past returns.

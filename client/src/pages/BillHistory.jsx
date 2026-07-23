@@ -1,38 +1,57 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { 
   Receipt, 
   Search, 
-  Filter, 
   Printer, 
-  Calendar, 
   RefreshCw, 
-  Plus, 
   CheckCircle2, 
-  Clock,
-  ArrowRight
+  Clock, 
+  Calendar,
+  RotateCcw
 } from 'lucide-react';
 import { getBills } from '@/services/billService';
+import { createReturn } from '@/services/returnService';
 import { LogoWatermark } from '@/components/LogoWatermark';
 import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
+import { Select } from '@/components/ui/Select';
+import { Dialog } from '@/components/ui/Dialog';
 import { Badge } from '@/components/ui/Badge';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/Table';
 import { PrintableBill } from '@/components/PrintableBill';
+import { PrintableReturn } from '@/components/PrintableReturn';
 
 export function BillHistory() {
-  const navigate = useNavigate();
-
-  const [searchTerm, setSearchTerm] = useState('');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
-
   const [bills, setBills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Search & Date Filters
+  const [searchTerm, setSearchTerm] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+
+  // Selected Bill for Reprint
   const [selectedBill, setSelectedBill] = useState(null);
+
+  // Customer Return Modal State
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [billToReturn, setBillToReturn] = useState(null);
+  const [selectedLineIndex, setSelectedLineIndex] = useState(0);
+  const [returnQty, setReturnQty] = useState(1);
+  const [returnReason, setReturnReason] = useState('wrong_item');
+  const [restocked, setRestocked] = useState(true);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [refundAmount, setRefundAmount] = useState(0);
+  const [notes, setNotes] = useState('');
+  const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
+
+  // Printable Return Slip state
+  const [createdReturnRecord, setCreatedReturnRecord] = useState(null);
+  const [isPrintReturnModalOpen, setIsPrintReturnModalOpen] = useState(false);
 
   const fetchBillsList = useCallback(async () => {
     setLoading(true);
@@ -46,24 +65,123 @@ export function BillHistory() {
       const res = await getBills(params);
       setBills(res.data || []);
     } catch (err) {
-      console.error('Failed to fetch bill history:', err);
-      setError(err.response?.data?.error?.message || 'Failed to fetch bill history.');
+      console.error('Failed to fetch bills history:', err);
+      setError('Failed to load bill history. Please try again.');
     } finally {
       setLoading(false);
     }
   }, [searchTerm, fromDate, toDate]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchBillsList();
-    }, 300);
-    return () => clearTimeout(timer);
+    fetchBillsList();
   }, [fetchBillsList]);
 
-  const formatDate = (d) => {
-    if (!d) return 'N/A';
-    const date = new Date(d);
-    return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  const handleOpenReturnModal = (bill) => {
+    setBillToReturn(bill);
+    setSelectedLineIndex(0);
+    setCustomerName(bill.customerName || '');
+    setCustomerPhone(bill.customerPhone || '');
+    setReturnReason('wrong_item');
+    setRestocked(true);
+    setNotes('');
+
+    const firstItem = (bill.items || [])[0];
+    if (firstItem) {
+      setReturnQty(1);
+      setRefundAmount(Number(firstItem.mrp || 0));
+    } else {
+      setReturnQty(1);
+      setRefundAmount(0);
+    }
+
+    setIsReturnModalOpen(true);
+  };
+
+  const handleLineItemChange = (indexStr) => {
+    const idx = Number(indexStr);
+    setSelectedLineIndex(idx);
+    const lineItem = (billToReturn?.items || [])[idx];
+    if (lineItem) {
+      setReturnQty(1);
+      setRefundAmount(Number(lineItem.mrp || 0));
+    }
+  };
+
+  const handleQtyChange = (qtyVal) => {
+    const q = Number(qtyVal) || 1;
+    setReturnQty(q);
+    const lineItem = (billToReturn?.items || [])[selectedLineIndex];
+    if (lineItem) {
+      setRefundAmount(q * Number(lineItem.mrp || 0));
+    }
+  };
+
+  const handleReasonChange = (reasonVal) => {
+    setReturnReason(reasonVal);
+    if (['expired', 'damaged'].includes(reasonVal)) {
+      setRestocked(false);
+    } else {
+      setRestocked(true);
+    }
+  };
+
+  const handleConfirmCustomerReturn = async (e) => {
+    e.preventDefault();
+    if (!billToReturn) return;
+
+    const lineItems = billToReturn.items || [];
+    const selectedLine = lineItems[selectedLineIndex];
+    if (!selectedLine) {
+      alert('Please select an item from the bill to return.');
+      return;
+    }
+
+    const numQty = Number(returnQty);
+    if (isNaN(numQty) || numQty < 1 || numQty > selectedLine.qty) {
+      alert(`Return quantity cannot exceed original sold quantity of ${selectedLine.qty}.`);
+      return;
+    }
+
+    setIsSubmittingReturn(true);
+    try {
+      const payload = {
+        type: 'customer',
+        referenceBillId: billToReturn._id,
+        itemId: selectedLine.itemId?._id || selectedLine.itemId,
+        batchId: selectedLine.batchId?._id || selectedLine.batchId,
+        storeType: selectedLine.itemId?.storeType || billToReturn.storeType || 'medical',
+        quantity: numQty,
+        reason: returnReason,
+        restocked,
+        customerName,
+        customerPhone,
+        refundAmount: Number(refundAmount) || 0,
+        returnDate: new Date().toISOString().split('T')[0],
+        notes,
+      };
+
+      const res = await createReturn(payload);
+      setIsReturnModalOpen(false);
+      setBillToReturn(null);
+
+      // Show printable return slip
+      if (res.data) {
+        setCreatedReturnRecord(res.data);
+        setIsPrintReturnModalOpen(true);
+      }
+    } catch (err) {
+      console.error('Failed to record customer return:', err);
+      alert(err.response?.data?.error?.message || 'Failed to process customer return.');
+    } finally {
+      setIsSubmittingReturn(false);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
   return (
@@ -76,26 +194,22 @@ export function BillHistory() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-heading font-bold text-primary flex items-center gap-2">
-              <Receipt className="w-6 h-6 text-accent" />
-              <span>Bill Transaction History</span>
+              <Receipt className="w-6 h-6 text-secondary" />
+              <span>Sales Invoices & Bill History</span>
             </h1>
             <p className="text-xs text-muted mt-1">
-              Search, view, and reprint past GST sales receipts and invoices.
+              Search, filter, reprint, and process customer returns for sales invoices.
             </p>
           </div>
-
-          <Button variant="default" size="sm" onClick={() => navigate('/billing')} className="gap-2">
-            <Plus className="w-4 h-4 text-accent" />
-            <span>Create New Bill</span>
-          </Button>
         </div>
 
-        {/* Search & Date Filters */}
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-4 bg-white/90 backdrop-blur-sm p-4 rounded-xl border border-gray-200/80 shadow-sm">
-          <div className="relative w-full lg:w-96">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        {/* Filter Controls Bar */}
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-4 bg-white/80 p-4 rounded-2xl border border-gray-200 shadow-sm backdrop-blur-sm">
+          <div className="relative w-full lg:w-80">
+            <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" />
             <Input
-              placeholder="Search by Bill No or Customer Name..."
+              type="text"
+              placeholder="Search by Bill No or Customer..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 text-xs bg-white"
@@ -162,19 +276,15 @@ export function BillHistory() {
         {/* STATE 3: EMPTY */}
         {!loading && !error && bills.length === 0 && (
           <Card className="p-12 text-center flex flex-col items-center justify-center gap-3 bg-white/90">
-            <div className="w-12 h-12 rounded-2xl bg-teal-100 text-primary flex items-center justify-center">
-              <Receipt className="w-6 h-6" />
+            <div className="w-12 h-12 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center">
+              <Receipt className="w-7 h-7" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-primary">No Bills Found</h3>
+              <h3 className="text-base font-bold text-teal-800">No Invoices Found</h3>
               <p className="text-xs text-muted mt-1 max-w-sm">
-                No bills recorded yet matching your filter parameters. Create your first sale invoice!
+                No bills match your current search and date filter criteria.
               </p>
             </div>
-            <Button variant="default" size="sm" onClick={() => navigate('/billing')} className="mt-2 gap-2">
-              <span>Create First Bill</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Button>
           </Card>
         )}
 
@@ -239,15 +349,27 @@ export function BillHistory() {
                     </TableCell>
 
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelectedBill(bill)}
-                        className="h-8 px-2.5 text-xs gap-1 text-secondary hover:text-secondary-dark"
-                      >
-                        <Printer className="w-3.5 h-3.5" />
-                        <span>View / Reprint</span>
-                      </Button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenReturnModal(bill)}
+                          className="h-8 px-2.5 text-xs gap-1 border-blue-300 text-blue-800 hover:bg-blue-50"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Process Return</span>
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedBill(bill)}
+                          className="h-8 px-2.5 text-xs gap-1 text-secondary hover:text-secondary-dark"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>Reprint</span>
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -262,6 +384,144 @@ export function BillHistory() {
           onClose={() => setSelectedBill(null)}
           bill={selectedBill}
         />
+
+        {/* Customer Return Dialog */}
+        <Dialog
+          isOpen={isReturnModalOpen}
+          onClose={() => setIsReturnModalOpen(false)}
+          title={`Process Return for Bill ${billToReturn?.billNo}`}
+          description="Select item to return, adjust quantity, and record customer refund."
+          className="max-w-md"
+        >
+          <form onSubmit={handleConfirmCustomerReturn} className="space-y-4 text-xs">
+            <div>
+              <Label htmlFor="itemSelect">Select Line Item to Return</Label>
+              <Select
+                id="itemSelect"
+                value={selectedLineIndex}
+                onChange={(e) => handleLineItemChange(e.target.value)}
+              >
+                {(billToReturn?.items || []).map((itemLine, idx) => (
+                  <option key={idx} value={idx}>
+                    {itemLine.itemId?.name || 'Item'} (Batch: {itemLine.batchId?.batchNo || 'N/A'}) — Sold Qty: {itemLine.qty} @ ₹{itemLine.mrp}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="returnQty">Return Quantity</Label>
+                <Input
+                  id="returnQty"
+                  type="number"
+                  min="1"
+                  max={(billToReturn?.items || [])[selectedLineIndex]?.qty || 1}
+                  value={returnQty}
+                  onChange={(e) => handleQtyChange(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="returnReason">Return Reason</Label>
+                <Select
+                  id="returnReason"
+                  value={returnReason}
+                  onChange={(e) => handleReasonChange(e.target.value)}
+                  required
+                >
+                  <option value="wrong_item">Wrong Item Dispensed</option>
+                  <option value="customer_dissatisfaction">Customer Return / Exchange</option>
+                  <option value="expired">Expired Medicine</option>
+                  <option value="damaged">Damaged / Broken Packaging</option>
+                  <option value="other">Other Reason</option>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 p-2.5 bg-slate-50 border rounded-lg">
+              <input
+                type="checkbox"
+                id="restockedCheck"
+                checked={restocked}
+                onChange={(e) => setRestocked(e.target.checked)}
+                className="w-4 h-4 text-primary rounded"
+              />
+              <Label htmlFor="restockedCheck" className="cursor-pointer text-xs font-medium">
+                Restock item back to inventory (increments batch stock)
+              </Label>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="customerName">Customer Name</Label>
+                <Input
+                  id="customerName"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="e.g. Ramesh Patel"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="customerPhone">Customer Phone</Label>
+                <Input
+                  id="customerPhone"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  placeholder="e.g. 9876543210"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="refundAmount">Refund Amount (₹)</Label>
+                <Input
+                  id="refundAmount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={refundAmount}
+                  onChange={(e) => setRefundAmount(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="notes">Notes / Remarks</Label>
+                <Input
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Optional return notes"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsReturnModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="default" size="sm" disabled={isSubmittingReturn}>
+                {isSubmittingReturn ? 'Processing...' : 'Confirm Customer Return'}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
+
+        {/* Printable Customer Return Slip Modal */}
+        {createdReturnRecord && (
+          <PrintableReturn
+            isOpen={isPrintReturnModalOpen}
+            onClose={() => {
+              setIsPrintReturnModalOpen(false);
+              setCreatedReturnRecord(null);
+            }}
+            returnRecord={createdReturnRecord}
+          />
+        )}
       </div>
     </div>
   );
