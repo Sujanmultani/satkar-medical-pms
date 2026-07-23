@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -11,7 +11,9 @@ import {
   History,
   Settings, 
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  Menu,
+  X
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import logoAsset from '@/assets/satkar-logo.jpeg';
@@ -20,6 +22,7 @@ import { LogoWatermark } from './LogoWatermark';
 export function Sidebar() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const navItems = [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -38,26 +41,33 @@ export function Sidebar() {
     navigate('/login');
   };
 
-  return (
-    <aside className="relative w-64 bg-primary text-white flex flex-col justify-between h-screen sticky top-0 overflow-hidden shadow-2xl z-30 select-none border-r border-white/10">
-      {/* Subtle Logo Bleed Backdrop */}
-      <LogoWatermark opacity={0.06} scale={1.8} position="sidebar" />
-
+  const NavContent = () => (
+    <>
       {/* Top Section */}
       <div className="relative z-10 p-5">
         {/* Brand Header */}
-        <div className="flex items-center gap-3 pb-6 border-b border-white/10">
-          <div className="w-10 h-10 rounded-xl bg-white p-1 shadow-md flex items-center justify-center shrink-0">
-            <img src={logoAsset} alt="Satkar Logo" className="w-full h-full object-contain" />
+        <div className="flex items-center justify-between pb-6 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white p-1 shadow-md flex items-center justify-center shrink-0">
+              <img src={logoAsset} alt="Satkar Logo" className="w-full h-full object-contain" />
+            </div>
+            <div>
+              <h1 className="font-heading font-bold text-lg tracking-tight text-white leading-none">
+                SATKAR MEDICAL
+              </h1>
+              <p className="text-[10px] text-secondary-light/80 tracking-wider uppercase mt-1 font-mono">
+                Pharmacy & Provision
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-heading font-bold text-lg tracking-tight text-white leading-none">
-              SATKAR MEDICAL
-            </h1>
-            <p className="text-[10px] text-secondary-light/80 tracking-wider uppercase mt-1 font-mono">
-              Pharmacy & Provision
-            </p>
-          </div>
+
+          {/* Close button inside mobile menu */}
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="md:hidden p-1.5 rounded-lg text-white/80 hover:bg-white/10"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Navigation Items */}
@@ -68,7 +78,13 @@ export function Sidebar() {
               <NavLink
                 key={item.path}
                 to={item.disabled ? '#' : item.path}
-                onClick={(e) => item.disabled && e.preventDefault()}
+                onClick={(e) => {
+                  if (item.disabled) {
+                    e.preventDefault();
+                  } else {
+                    setMobileOpen(false);
+                  }
+                }}
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
                     item.disabled
@@ -100,7 +116,7 @@ export function Sidebar() {
       <div className="relative z-10 p-4 border-t border-white/10 bg-primary-hover/50 backdrop-blur-sm">
         <div className="flex items-center justify-between mb-3 px-1">
           <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="w-8 h-8 rounded-full bg-secondary/30 border border-secondary text-white flex items-center justify-center font-bold text-xs">
+            <div className="w-8 h-8 rounded-full bg-secondary/30 border border-secondary text-white flex items-center justify-center font-bold text-xs shrink-0">
               {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
             </div>
             <div className="truncate">
@@ -121,6 +137,54 @@ export function Sidebar() {
           <span>Log Out</span>
         </button>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile Top Navigation Header */}
+      <div className="md:hidden w-full bg-primary text-white p-3 flex items-center justify-between sticky top-0 z-40 shadow-md border-b border-white/10">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-white p-1 shadow-sm flex items-center justify-center shrink-0">
+            <img src={logoAsset} alt="Satkar Logo" className="w-full h-full object-contain" />
+          </div>
+          <div>
+            <h1 className="font-heading font-bold text-sm tracking-tight leading-none">SATKAR MEDICAL</h1>
+            <p className="text-[9px] text-secondary-light/80 font-mono">Pharmacy & Provision</p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white"
+          aria-label="Toggle navigation menu"
+        >
+          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
+      </div>
+
+      {/* Desktop Sticky Sidebar */}
+      <aside className="hidden md:flex relative w-64 bg-primary text-white flex-col justify-between h-screen sticky top-0 overflow-hidden shadow-2xl z-30 select-none border-r border-white/10 shrink-0">
+        <LogoWatermark opacity={0.06} scale={1.8} position="sidebar" />
+        <NavContent />
+      </aside>
+
+      {/* Mobile Slide-Over Drawer Overlay */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+            onClick={() => setMobileOpen(false)}
+          />
+
+          {/* Drawer Sidebar Panel */}
+          <aside className="relative w-72 bg-primary text-white flex flex-col justify-between h-full shadow-2xl z-10 select-none border-r border-white/10 overflow-y-auto">
+            <LogoWatermark opacity={0.06} scale={1.8} position="sidebar" />
+            <NavContent />
+          </aside>
+        </div>
+      )}
+    </>
   );
 }

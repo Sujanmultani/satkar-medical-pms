@@ -33,7 +33,7 @@ export function LogoWatermark({
         style={{
           transform: scale !== 1 ? `scale(${scale})` : undefined,
         }}
-        className="w-[650px] h-[650px] max-w-none object-contain filter mix-blend-multiply brightness-90 contrast-125 font-bold"
+        className="w-[400px] h-[400px] md:w-[650px] md:h-[650px] max-w-none object-contain filter mix-blend-multiply brightness-90 contrast-125 font-bold"
       />
     </div>
   );

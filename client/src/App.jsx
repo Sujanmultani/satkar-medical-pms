@@ -22,7 +22,7 @@ function ProtectedLayout() {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex flex-col md:flex-row min-h-screen bg-background">
       {/* Sidebar renders ONLY on authenticated routes */}
       <Sidebar />
       <main className="flex-1 overflow-x-hidden">
