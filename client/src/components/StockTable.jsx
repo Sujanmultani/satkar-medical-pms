@@ -473,7 +473,7 @@ export function StockTable({ storeType = 'medical' }) {
                   {/* Expanded Nested Batches Sub-table */}
                   {isExpanded && (
                     <TableRow className="bg-teal-50/20">
-                      <TableCell colSpan={storeType === 'medical' ? 8 : 7} className="p-4 pl-12">
+                      <TableCell colSpan={storeType === 'medical' ? 9 : 8} className="p-4 pl-12">
                         <div className="rounded-xl border border-teal-200/80 bg-white p-3 shadow-inner">
                           <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100">
                             <h4 className="text-xs font-heading font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
@@ -505,6 +505,7 @@ export function StockTable({ storeType = 'medical' }) {
                                 <thead className="bg-gray-50 text-gray-500 font-mono text-[10px] uppercase">
                                   <tr>
                                     <th className="py-2 px-3">Batch No</th>
+                                    <th className="py-2 px-3">Supplier</th>
                                     <th className="py-2 px-3">Mfg Date</th>
                                     <th className="py-2 px-3">Expiry Date</th>
                                     <th className="py-2 px-3 text-center">Stock Qty</th>
@@ -519,6 +520,7 @@ export function StockTable({ storeType = 'medical' }) {
                                   {batches.map((batch) => (
                                     <tr key={batch._id} className="hover:bg-gray-50/80">
                                       <td className="py-2 px-3 font-semibold text-primary">{batch.batchNo}</td>
+                                      <td className="py-2 px-3 text-gray-700 font-sans font-medium">{batch.supplierId?.name || '—'}</td>
                                       <td className="py-2 px-3 text-gray-500">{formatDate(batch.mfgDate)}</td>
                                       <td className="py-2 px-3 font-medium text-gray-800">{formatDate(batch.expiryDate)}</td>
                                       <td className="py-2 px-3 text-center font-bold">{batch.qty}</td>

@@ -6,7 +6,10 @@ const { computeBatchStatus } = require('../utils/batchStatus');
 const populateItemBatches = async (items) => {
   if (!items || items.length === 0) return [];
   const itemIds = items.map((item) => item._id);
-  const batches = await Batch.find({ itemId: { $in: itemIds } }).sort({ expiryDate: 1 }).lean();
+  const batches = await Batch.find({ itemId: { $in: itemIds } })
+    .populate('supplierId', 'name phone address')
+    .sort({ expiryDate: 1 })
+    .lean();
   
   const batchesByItem = {};
   batches.forEach((b) => {
