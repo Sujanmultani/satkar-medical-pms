@@ -47,8 +47,8 @@ export function Dashboard() {
 
   return (
     <div className="relative min-h-screen p-6 md:p-8 overflow-hidden bg-background">
-      {/* Background Watermark at subtle 4% opacity */}
-      <LogoWatermark opacity={0.04} scale={1.2} position="bottom-right" />
+      {/* Background Watermark at prominent 12% opacity */}
+      <LogoWatermark opacity={0.12} scale={1.4} position="center" />
 
       <div className="relative z-10 max-w-7xl mx-auto space-y-8">
         {/* Welcome Header */}

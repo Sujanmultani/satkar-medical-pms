@@ -86,8 +86,8 @@ export function ExpiryAlerts() {
 
   return (
     <div className="relative min-h-screen p-6 md:p-8 bg-background">
-      {/* 4% Opacity Logo Watermark backdrop */}
-      <LogoWatermark opacity={0.04} scale={1.5} position="bottom-right" />
+      {/* Prominent Logo Watermark backdrop */}
+      <LogoWatermark opacity={0.12} scale={1.4} position="center" />
 
       <div className="relative z-10 max-w-7xl mx-auto space-y-6">
         {/* Header */}
