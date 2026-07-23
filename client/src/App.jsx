@@ -10,6 +10,7 @@ import { ExpiryAlerts } from '@/pages/ExpiryAlerts';
 import { CompositionSearch } from '@/pages/CompositionSearch';
 import { Billing } from '@/pages/Billing';
 import { BillHistory } from '@/pages/BillHistory';
+import { Settings } from '@/pages/Settings';
 import { Sidebar } from '@/components/Sidebar';
 
 // Protected Route Wrapper
@@ -36,6 +37,7 @@ function ProtectedLayout() {
           <Route path="/composition-search" element={<CompositionSearch />} />
           <Route path="/billing" element={<Billing />} />
           <Route path="/bill-history" element={<BillHistory />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>

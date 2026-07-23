@@ -30,7 +30,7 @@ export function Sidebar() {
     { label: 'Billing', path: '/billing', icon: Receipt, disabled: false },
     { label: 'Bill History', path: '/bill-history', icon: History, disabled: false },
     { label: 'Expiry Alerts', path: '/expiry-alerts', icon: AlertTriangle, disabled: false },
-    { label: 'Settings', path: '/settings', icon: Settings, disabled: true },
+    { label: 'Settings', path: '/settings', icon: Settings, disabled: false },
   ];
 
   const handleLogout = () => {

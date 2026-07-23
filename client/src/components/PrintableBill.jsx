@@ -1,13 +1,22 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { markPrinted } from '@/services/billService';
+import { getSettings } from '@/services/settingsService';
 import logoAsset from '@/assets/satkar-logo.jpeg';
-import { Printer, MessageCircle, Share2, CheckCircle2 } from 'lucide-react';
+import { Printer, MessageCircle } from 'lucide-react';
 
-const BUSINESS_GSTIN = import.meta.env?.VITE_BUSINESS_GSTIN || '';
+export function PrintableBill({ isOpen, onClose, bill, businessInfo }) {
+  const [settings, setSettings] = useState(businessInfo || null);
 
-export function PrintableBill({ isOpen, onClose, bill }) {
+  useEffect(() => {
+    if (isOpen && !businessInfo) {
+      getSettings()
+        .then((res) => setSettings(res.data))
+        .catch((err) => console.error('Failed to load business settings for bill header:', err));
+    }
+  }, [isOpen, businessInfo]);
+
   if (!isOpen || !bill) return null;
 
   const handlePrint = async () => {
@@ -30,6 +39,11 @@ export function PrintableBill({ isOpen, onClose, bill }) {
   const items = bill.items || [];
   const gstBreakdown = bill.gstBreakdown || {};
 
+  const activeBusinessName = settings?.businessName || 'Satkar Medical';
+  const activeGstin = settings?.gstin ? settings.gstin : '[Not Configured]';
+  const activeAddress = settings?.address || 'Main Road, Jambusar';
+  const activePhone = settings?.phone || '';
+
   return (
     <Dialog
       isOpen={isOpen}
@@ -47,10 +61,12 @@ export function PrintableBill({ isOpen, onClose, bill }) {
             <div className="flex items-center gap-3">
               <img src={logoAsset} alt="Satkar Logo" className="w-12 h-12 object-contain" />
               <div>
-                <h2 className="text-lg font-heading font-bold text-primary leading-tight">SATKAR MEDICAL</h2>
+                <h2 className="text-lg font-heading font-bold text-primary uppercase leading-tight">
+                  {activeBusinessName}
+                </h2>
                 <p className="text-[10px] text-muted font-mono uppercase">Pharmacy & Provision Store</p>
                 <p className="text-[10px] text-gray-500 mt-0.5">
-                  Main Road, Jambusar • GSTIN: <span className="font-mono text-gray-700">{BUSINESS_GSTIN || '[Not Configured]'}</span>
+                  {activeAddress} {activePhone && `• Ph: ${activePhone}`} • GSTIN: <span className="font-mono text-gray-700">{activeGstin}</span>
                 </p>
               </div>
             </div>
@@ -140,7 +156,7 @@ export function PrintableBill({ isOpen, onClose, bill }) {
           </div>
 
           <div className="text-center text-[10px] text-muted pt-4 border-t border-dashed border-gray-200">
-            <p>Thank you for visiting Satkar Medical • Wish you good health!</p>
+            <p>Thank you for visiting {activeBusinessName} • Wish you good health!</p>
           </div>
         </div>
 
