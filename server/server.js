@@ -50,6 +50,14 @@ app.get('/api/health', (req, res) => {
 app.use(notFound);
 app.use(errorHandler);
 
+process.on('unhandledRejection', (reason, promise) => {
+  console.warn('[Process Warning] Unhandled Rejection:', reason?.message || reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[Process Error] Uncaught Exception:', err.message);
+});
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, '0.0.0.0', () => {

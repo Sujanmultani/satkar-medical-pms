@@ -6,13 +6,18 @@ const Batch = require('../models/Batch');
 const Invoice = require('../models/Invoice');
 const { computeBatchStatus } = require('../utils/batchStatus');
 
-// Instantiate Google Vision Client (automatically uses GOOGLE_APPLICATION_CREDENTIALS)
+// Instantiate Google Vision Client lazily
 let visionClient = null;
-try {
-  visionClient = new vision.ImageAnnotatorClient();
-} catch (err) {
-  console.warn('[Vision API Warning] ImageAnnotatorClient initialization deferred:', err.message);
-}
+const getVisionClient = () => {
+  if (!visionClient) {
+    try {
+      visionClient = new vision.ImageAnnotatorClient();
+    } catch (err) {
+      console.warn('[Vision API Warning] ImageAnnotatorClient initialization deferred:', err.message);
+    }
+  }
+  return visionClient;
+};
 
 // @desc    Scan invoice image using Google Vision OCR
 // @route   POST /api/invoices/scan
@@ -25,14 +30,26 @@ const scanInvoice = async (req, res, next) => {
       });
     }
 
-    if (!visionClient) {
-      visionClient = new vision.ImageAnnotatorClient();
+    const client = getVisionClient();
+    if (!client) {
+      return res.status(500).json({
+        error: { code: 'VISION_API_UNAVAILABLE', message: 'Google Cloud Vision API client is not configured.' },
+      });
     }
 
     // Call Google Vision API documentTextDetection
-    const [result] = await visionClient.documentTextDetection({
-      image: { content: req.file.buffer },
-    });
+    let result = null;
+    try {
+      const [resData] = await client.documentTextDetection({
+        image: { content: req.file.buffer },
+      });
+      result = resData;
+    } catch (ocrErr) {
+      console.error('[Vision API Error] OCR detection failed:', ocrErr.message);
+      return res.status(500).json({
+        error: { code: 'OCR_SCAN_FAILED', message: 'Google Vision OCR scan failed. Please check network/credentials.' },
+      });
+    }
 
     const fullTextAnnotation = result.fullTextAnnotation;
     const rawText = fullTextAnnotation ? fullTextAnnotation.text : '';
