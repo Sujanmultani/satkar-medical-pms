@@ -27,6 +27,11 @@ export const updateBatch = async (id, batchData) => {
   return response.data;
 };
 
+export const updatePaymentStatus = async (id, paymentStatus) => {
+  const response = await api.patch(`/batches/${id}/payment-status`, { paymentStatus });
+  return response.data;
+};
+
 export const deleteBatch = async (id) => {
   const response = await api.delete(`/batches/${id}`);
   return response.data;
@@ -39,5 +44,6 @@ export default {
   getExpired,
   createBatch,
   updateBatch,
+  updatePaymentStatus,
   deleteBatch,
 };

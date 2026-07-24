@@ -8,7 +8,7 @@ const { findOrCreateSupplier } = require('../services/supplierService');
 // @access  Private
 const createBatch = async (req, res, next) => {
   try {
-    const { itemId, batchNo, mfgDate, expiryDate, qty, purchaseRate, mrp, gstPercent, supplierName, supplierId } = req.body;
+    const { itemId, batchNo, mfgDate, expiryDate, qty, purchaseRate, mrp, gstPercent, supplierName, supplierId, paymentStatus, amountDue } = req.body;
 
     if (!itemId) {
       return res.status(400).json({
@@ -53,6 +53,8 @@ const createBatch = async (req, res, next) => {
     }
 
     const status = computeBatchStatus(expiryDate);
+    const finalAmountDue = amountDue !== undefined ? Math.max(0, Number(amountDue) || 0) : (numQty * numPurchaseRate);
+    const finalPaymentStatus = ['paid', 'pending'].includes(paymentStatus) ? paymentStatus : 'pending';
 
     const batch = await Batch.create({
       itemId,
@@ -65,6 +67,8 @@ const createBatch = async (req, res, next) => {
       mrp: numMrp,
       gstPercent: numGstPercent,
       status,
+      paymentStatus: finalPaymentStatus,
+      amountDue: finalAmountDue,
     });
 
     const populated = await Batch.findById(batch._id).populate('supplierId', 'name phone address').lean();
@@ -107,7 +111,7 @@ const getBatches = async (req, res, next) => {
 // @access  Private
 const updateBatch = async (req, res, next) => {
   try {
-    const { batchNo, mfgDate, expiryDate, qty, purchaseRate, mrp, gstPercent, supplierName, supplierId } = req.body;
+    const { batchNo, mfgDate, expiryDate, qty, purchaseRate, mrp, gstPercent, supplierName, supplierId, paymentStatus, amountDue } = req.body;
 
     const batch = await Batch.findById(req.params.id);
     if (!batch) {
@@ -133,9 +137,48 @@ const updateBatch = async (req, res, next) => {
     if (purchaseRate !== undefined) batch.purchaseRate = Math.max(0, Number(purchaseRate) || 0);
     if (mrp !== undefined) batch.mrp = Math.max(0, Number(mrp) || 0);
     if (gstPercent !== undefined) batch.gstPercent = Math.max(0, Number(gstPercent) || 0);
+    if (paymentStatus && ['paid', 'pending'].includes(paymentStatus)) batch.paymentStatus = paymentStatus;
+    if (amountDue !== undefined) {
+      batch.amountDue = Math.max(0, Number(amountDue) || 0);
+    } else if ((qty !== undefined || purchaseRate !== undefined) && batch.supplierId) {
+      batch.amountDue = batch.qty * batch.purchaseRate;
+    }
 
     await batch.save();
     const populated = await Batch.findById(batch._id).populate('supplierId', 'name phone address').lean();
+
+    return res.status(200).json({ data: populated });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update batch payment status (paid / pending)
+// @route   PATCH /api/batches/:id/payment-status
+// @access  Private
+const updatePaymentStatus = async (req, res, next) => {
+  try {
+    const { paymentStatus } = req.body;
+    if (!paymentStatus || !['paid', 'pending'].includes(paymentStatus)) {
+      return res.status(400).json({
+        error: { code: 'INVALID_STATUS', message: 'paymentStatus must be paid or pending.' },
+      });
+    }
+
+    const batch = await Batch.findById(req.params.id);
+    if (!batch) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Batch not found.' },
+      });
+    }
+
+    batch.paymentStatus = paymentStatus;
+    await batch.save();
+
+    const populated = await Batch.findById(batch._id)
+      .populate('itemId', 'name composition category unit hsnCode storeType')
+      .populate('supplierId', 'name phone address')
+      .lean();
 
     return res.status(200).json({ data: populated });
   } catch (error) {
@@ -215,6 +258,7 @@ module.exports = {
   createBatch,
   getBatches,
   updateBatch,
+  updatePaymentStatus,
   deleteBatch,
   getExpiringSoonBatches,
   getExpiredBatches,

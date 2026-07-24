@@ -520,7 +520,20 @@ export function StockTable({ storeType = 'medical' }) {
                                   {batches.map((batch) => (
                                     <tr key={batch._id} className="hover:bg-gray-50/80">
                                       <td className="py-2 px-3 font-semibold text-primary">{batch.batchNo}</td>
-                                      <td className="py-2 px-3 text-gray-700 font-sans font-medium">{batch.supplierId?.name || '—'}</td>
+                                      <td className="py-2 px-3 text-gray-700 font-sans font-medium">
+                                        {batch.supplierId?.name ? (
+                                          <div className="flex items-center gap-1.5">
+                                            <span>{batch.supplierId.name}</span>
+                                            {batch.paymentStatus === 'paid' ? (
+                                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold uppercase tracking-wider">Paid</span>
+                                            ) : (
+                                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-bold uppercase tracking-wider">Pending</span>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <span>—</span>
+                                        )}
+                                      </td>
                                       <td className="py-2 px-3 text-gray-500">{formatDate(batch.mfgDate)}</td>
                                       <td className="py-2 px-3 font-medium text-gray-800">{formatDate(batch.expiryDate)}</td>
                                       <td className="py-2 px-3 text-center font-bold">{batch.qty}</td>

@@ -4,6 +4,7 @@ const {
   createBatch,
   getBatches,
   updateBatch,
+  updatePaymentStatus,
   deleteBatch,
   getExpiringSoonBatches,
   getExpiredBatches,
@@ -18,6 +19,8 @@ router.route('/')
 
 router.get('/expiring-soon', getExpiringSoonBatches);
 router.get('/expired', getExpiredBatches);
+
+router.patch('/:id/payment-status', updatePaymentStatus);
 
 router.route('/:id')
   .put(updateBatch)

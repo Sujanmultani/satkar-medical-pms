@@ -14,7 +14,8 @@ import {
   ShieldCheck,
   Menu,
   X,
-  Undo2
+  Undo2,
+  Building2
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import logoAsset from '@/assets/satkar-logo.jpeg';
@@ -34,6 +35,7 @@ export function Sidebar() {
     { label: 'Billing', path: '/billing', icon: Receipt, disabled: false },
     { label: 'Bill History', path: '/bill-history', icon: History, disabled: false },
     { label: 'Returns History', path: '/returns', icon: Undo2, disabled: false },
+    { label: 'Suppliers', path: '/suppliers', icon: Building2, disabled: false },
     { label: 'Expiry Alerts', path: '/expiry-alerts', icon: AlertTriangle, disabled: false },
     { label: 'Settings', path: '/settings', icon: Settings, disabled: false },
   ];

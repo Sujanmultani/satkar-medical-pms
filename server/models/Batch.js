@@ -53,6 +53,17 @@ const batchSchema = new mongoose.Schema(
       default: 'active',
       index: true,
     },
+    paymentStatus: {
+      type: String,
+      enum: ['paid', 'pending'],
+      default: 'pending',
+      index: true,
+    },
+    amountDue: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
   },
   {
     timestamps: true,
