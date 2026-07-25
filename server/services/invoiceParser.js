@@ -95,8 +95,8 @@ Analyze the attached invoice image and extract structured JSON data according to
      - qty: Number of packs/units purchased (integer, default 1).
      - purchaseRate: Purchase rate per pack (number).
      - mrp: Maximum Retail Price per pack (number).
-     - gstPercent: GST percentage (number, e.g. 5, 12, 18, 6.9, 13.54).
-     - confidence: "high" if name, batchNo, expiryDate, and rate/mrp are clearly legible; otherwise "low".
+     - gstPercent: Read the EXACT GST/tax percentage printed for THIS SPECIFIC line item on the invoice (number, e.g. 5, 12, 18, 6.9, 13.54). Look at the GST% column, or add CGST%+SGST% (e.g., 2.5%+2.5% = 5, 6%+6% = 12, 9%+9% = 18). Do NOT assume or default to 5 or 12 — read the actual printed number. If GST% is omitted or illegible for this line, return null.
+     - confidence: "high" if name, batchNo, expiryDate, rate/mrp, and gstPercent are clearly legible; set to "low" if gstPercent or any other key field is missing, ambiguous, or illegible.
 
 3. STRICT DUPLICATE PREVENTION & MERGING RULES:
    - Each physical purchase line item on the invoice must appear EXACTLY ONCE in the JSON output array.
@@ -118,7 +118,7 @@ OUTPUT JSON FORMAT (Strict JSON):
       "qty": 1,
       "purchaseRate": 0.0,
       "mrp": 0.0,
-      "gstPercent": 12,
+      "gstPercent": null,
       "confidence": "high"
     }
   ]
@@ -161,6 +161,7 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
       const parsedRate = typeof item.purchaseRate === 'number' && !isNaN(item.purchaseRate) ? item.purchaseRate : parseFloat(item.purchaseRate);
       const parsedMrp = typeof item.mrp === 'number' && !isNaN(item.mrp) ? item.mrp : parseFloat(item.mrp);
       const parsedGst = typeof item.gstPercent === 'number' && !isNaN(item.gstPercent) ? item.gstPercent : parseFloat(item.gstPercent);
+      const hasValidGst = !isNaN(parsedGst) && parsedGst >= 0;
 
       return {
         name: item.name ? String(item.name).trim() : 'Unknown Product',
@@ -171,8 +172,8 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
         qty: !isNaN(parsedQty) && parsedQty > 0 ? parsedQty : 1,
         purchaseRate: !isNaN(parsedRate) && parsedRate >= 0 ? parsedRate : 0,
         mrp: !isNaN(parsedMrp) && parsedMrp >= 0 ? parsedMrp : 0,
-        gstPercent: !isNaN(parsedGst) && parsedGst >= 0 ? parsedGst : 12,
-        confidence: ['high', 'low'].includes(item.confidence) ? item.confidence : 'low',
+        gstPercent: hasValidGst ? parsedGst : null,
+        confidence: (!hasValidGst || item.confidence === 'low') ? 'low' : 'high',
       };
     });
 

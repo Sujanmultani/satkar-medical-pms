@@ -167,7 +167,7 @@ export function InvoiceScan() {
         qty: 10,
         purchaseRate: 0,
         mrp: 0,
-        gstPercent: 12,
+        gstPercent: 0,
         confidence: 'high',
       },
     ]);
