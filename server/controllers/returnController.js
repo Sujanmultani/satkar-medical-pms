@@ -127,6 +127,7 @@ const createReturn = async (req, res, next) => {
       returnDate: new Date(returnDate),
       restocked: finalRestocked,
       supplierName: supplierName ? supplierName.trim() : '',
+      supplierId: batch.supplierId || null,
       creditNoteNo: creditNoteNo ? creditNoteNo.trim() : '',
       referenceBillId: referenceBillId || null,
       customerName: customerName ? customerName.trim() : '',

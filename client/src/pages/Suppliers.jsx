@@ -13,7 +13,8 @@ import {
   Layers, 
   AlertCircle,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Undo2
 } from 'lucide-react';
 import { getSuppliers, getSupplierById } from '@/services/supplierService';
 import { updatePaymentStatus } from '@/services/batchService';
@@ -302,6 +303,75 @@ export function Suppliers() {
                                 >
                                   {isUpdating ? '...' : isPaid ? 'Mark Pending' : 'Mark Paid'}
                                 </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  )}
+                </Card>
+
+                {/* Supplier Returns & Credit Notes Table */}
+                <Card className="p-5 bg-white/95">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-base font-heading font-bold text-primary flex items-center gap-2">
+                        <Undo2 className="w-4 h-4 text-amber-600" />
+                        <span>Supplier Returns & Credit Notes</span>
+                      </h3>
+                      <p className="text-xs text-muted mt-0.5">
+                        Showing all {(supplierDetail.returns || []).length} return vouchers issued to {supplierDetail.supplier.name}.
+                      </p>
+                    </div>
+                  </div>
+
+                  {(!supplierDetail.returns || supplierDetail.returns.length === 0) ? (
+                    <div className="p-8 text-center bg-gray-50 rounded-xl">
+                      <Layers className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                      <p className="text-xs font-medium text-gray-500">No stock returns recorded for this supplier.</p>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="font-mono text-xs">Return Date</TableHead>
+                          <TableHead>Medicine / Item Name</TableHead>
+                          <TableHead>Batch No</TableHead>
+                          <TableHead className="text-center font-mono">Qty Returned</TableHead>
+                          <TableHead>Reason</TableHead>
+                          <TableHead className="font-mono">Credit Note No</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {supplierDetail.returns.map((ret) => {
+                          const item = ret.itemId || {};
+                          const batch = ret.batchId || {};
+                          const reasonLabels = {
+                            expired: 'Expired Stock',
+                            damaged: 'Damaged Goods',
+                            other: 'Other Reason',
+                          };
+
+                          return (
+                            <TableRow key={ret._id} className="bg-amber-50/10">
+                              <TableCell className="font-mono text-xs text-gray-700">{formatDate(ret.returnDate)}</TableCell>
+                              <TableCell className="font-semibold text-primary">
+                                {item.name || 'Unknown Item'}
+                              </TableCell>
+                              <TableCell className="font-mono font-bold text-gray-800">{batch.batchNo || ret.batchNo || 'N/A'}</TableCell>
+                              <TableCell className="text-center font-mono font-bold text-amber-800">{ret.quantity}</TableCell>
+                              <TableCell className="text-xs">
+                                <Badge variant="outline" className="text-amber-800 border-amber-300 bg-amber-50">
+                                  {reasonLabels[ret.reason] || ret.reason}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="font-mono text-xs">
+                                {ret.creditNoteNo ? (
+                                  <span className="font-bold text-primary">{ret.creditNoteNo}</span>
+                                ) : (
+                                  <span className="italic text-gray-400">Pending</span>
+                                )}
                               </TableCell>
                             </TableRow>
                           );

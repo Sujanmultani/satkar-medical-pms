@@ -52,6 +52,10 @@ const returnSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    supplierId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Supplier',
+    },
     creditNoteNo: {
       type: String,
       trim: true,

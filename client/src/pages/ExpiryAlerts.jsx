@@ -438,7 +438,13 @@ export function ExpiryAlerts() {
                   min="1"
                   max={batchToReturn?.qty || 1}
                   value={returnQty}
-                  onChange={(e) => setReturnQty(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const cleanVal = typeof val === 'string' && val.length > 1 && /^0\d/.test(val)
+                      ? val.replace(/^0+/, '')
+                      : val;
+                    setReturnQty(cleanVal);
+                  }}
                   required
                 />
               </div>

@@ -213,7 +213,7 @@ const getBatchesByStatus = async (req, res, next, targetStatus) => {
     const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
     const skip = (page - 1) * limit;
 
-    const batchFilter = { status: targetStatus };
+    const batchFilter = { status: targetStatus, qty: { $gt: 0 } };
 
     if (storeType && ['medical', 'provision'].includes(storeType)) {
       const items = await Item.find({ storeType }).select('_id').lean();

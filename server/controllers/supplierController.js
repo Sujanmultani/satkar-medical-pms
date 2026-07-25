@@ -1,5 +1,6 @@
 const Supplier = require('../models/Supplier');
 const Batch = require('../models/Batch');
+const Return = require('../models/Return');
 const { searchSuppliers, findOrCreateSupplier } = require('../services/supplierService');
 
 // @desc    Get suppliers list (paginated, with search & payment summaries)
@@ -91,6 +92,21 @@ const getSupplierById = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .lean();
 
+    // Fetch return records for this supplier
+    const batchIds = batches.map((b) => b._id);
+    const returns = await Return.find({
+      type: 'supplier',
+      $or: [
+        { supplierId: supplier._id },
+        { batchId: { $in: batchIds } },
+        { supplierName: new RegExp(supplier.name.trim().replace(/[/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i') },
+      ],
+    })
+      .populate('itemId', 'name composition category unit hsnCode storeType')
+      .populate('batchId', 'batchNo expiryDate mrp purchaseRate')
+      .sort({ returnDate: -1, createdAt: -1 })
+      .lean();
+
     let totalDue = 0;
     let pendingCount = 0;
     let paidCount = 0;
@@ -116,11 +132,13 @@ const getSupplierById = async (req, res, next) => {
       data: {
         supplier,
         batches: batchesProcessed,
+        returns,
         summary: {
           totalDue: Math.round(totalDue * 100) / 100,
           pendingCount,
           paidCount,
           totalBatches: batches.length,
+          totalReturns: returns.length,
         },
       },
     });
