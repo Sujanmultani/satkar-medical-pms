@@ -449,8 +449,6 @@ export function InvoiceScan() {
 
               {/* Table */}
               <div className="overflow-x-auto">
-              {/* Table */}
-              <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left border-collapse min-w-[1450px]">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200 text-gray-700 font-mono uppercase text-[10px]">
