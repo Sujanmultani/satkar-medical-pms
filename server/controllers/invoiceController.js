@@ -1,25 +1,11 @@
-const vision = require('@google-cloud/vision');
-const { parseInvoiceText } = require('../services/invoiceParser');
+const { parseInvoiceImageWithGemini } = require('../services/invoiceParser');
 const { findOrCreateSupplier } = require('../services/supplierService');
 const Item = require('../models/Item');
 const Batch = require('../models/Batch');
 const Invoice = require('../models/Invoice');
 const { computeBatchStatus } = require('../utils/batchStatus');
 
-// Instantiate Google Vision Client lazily
-let visionClient = null;
-const getVisionClient = () => {
-  if (!visionClient) {
-    try {
-      visionClient = new vision.ImageAnnotatorClient();
-    } catch (err) {
-      console.warn('[Vision API Warning] ImageAnnotatorClient initialization deferred:', err.message);
-    }
-  }
-  return visionClient;
-};
-
-// @desc    Scan invoice image using Google Vision OCR
+// @desc    Scan invoice image using Gemini (Vertex AI Multimodal)
 // @route   POST /api/invoices/scan
 // @access  Private
 const scanInvoice = async (req, res, next) => {
@@ -30,55 +16,22 @@ const scanInvoice = async (req, res, next) => {
       });
     }
 
-    const client = getVisionClient();
-    if (!client) {
-      return res.status(500).json({
-        error: { code: 'VISION_API_UNAVAILABLE', message: 'Google Cloud Vision API client is not configured.' },
-      });
-    }
-
-    // Call Google Vision API documentTextDetection
-    let result = null;
-    try {
-      const [resData] = await client.documentTextDetection({
-        image: { content: req.file.buffer },
-      });
-      result = resData;
-    } catch (ocrErr) {
-      console.error('[Vision API Error] OCR detection failed:', ocrErr.message);
-      return res.status(500).json({
-        error: { code: 'OCR_SCAN_FAILED', message: 'Google Vision OCR scan failed. Please check network/credentials.' },
-      });
-    }
-
-    const fullTextAnnotation = result.fullTextAnnotation;
-    const rawText = fullTextAnnotation ? fullTextAnnotation.text : '';
-
-    if (!rawText || !rawText.trim()) {
-      return res.status(422).json({
-        error: {
-          code: 'UNREADABLE_IMAGE',
-          message: 'Could not extract readable text from the invoice image. Please try a clearer picture.',
-        },
-      });
-    }
-
-    // Run heuristics parser
-    const parsedData = parseInvoiceText(rawText);
+    // Call Gemini multimodal invoice parser
+    const parsedData = await parseInvoiceImageWithGemini(req.file.buffer, req.file.mimetype);
 
     return res.status(200).json({
-      rawText,
+      rawText: 'Gemini Multimodal Structured Extraction',
       supplierName: parsedData.supplierName,
       invoiceNo: parsedData.invoiceNo,
       invoiceDate: parsedData.invoiceDate,
       items: parsedData.items,
     });
   } catch (error) {
-    console.error('[Invoice OCR Error]', error);
+    console.error('[Invoice Gemini Scan Error]', error);
     return res.status(500).json({
       error: {
         code: 'OCR_SCAN_FAILED',
-        message: error.message || 'Failed to scan invoice via Google Vision OCR.',
+        message: 'Could not read this invoice — please enter items manually.',
       },
     });
   }
@@ -157,6 +110,8 @@ const confirmInvoice = async (req, res, next) => {
         mrp: numMrp,
         gstPercent: numGstPercent,
         status: computeBatchStatus(expiryDate),
+        paymentStatus: 'pending',
+        amountDue: numQty * numPurchaseRate,
       });
 
       createdBatchesCount++;
