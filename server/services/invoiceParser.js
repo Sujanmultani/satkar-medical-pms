@@ -156,18 +156,25 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
     const parsedData = JSON.parse(textOutput);
 
     // Post-process and normalize fields
-    const rawItems = (parsedData.items || []).map((item) => ({
-      name: item.name ? String(item.name).trim() : 'Unknown Product',
-      composition: item.composition ? String(item.composition).trim() : '',
-      hsnCode: item.hsnCode ? String(item.hsnCode).trim() : '',
-      batchNo: item.batchNo ? String(item.batchNo).trim() : `B-${Date.now().toString().slice(-4)}`,
-      expiryDate: item.expiryDate ? parseExpiryDate(item.expiryDate) || item.expiryDate : null,
-      qty: Number(item.qty) || 1,
-      purchaseRate: Number(item.purchaseRate) || 0,
-      mrp: Number(item.mrp) || 0,
-      gstPercent: Number(item.gstPercent) || 12,
-      confidence: ['high', 'low'].includes(item.confidence) ? item.confidence : 'low',
-    }));
+    const rawItems = (parsedData.items || []).map((item) => {
+      const parsedQty = typeof item.qty === 'number' && !isNaN(item.qty) ? item.qty : parseInt(item.qty, 10);
+      const parsedRate = typeof item.purchaseRate === 'number' && !isNaN(item.purchaseRate) ? item.purchaseRate : parseFloat(item.purchaseRate);
+      const parsedMrp = typeof item.mrp === 'number' && !isNaN(item.mrp) ? item.mrp : parseFloat(item.mrp);
+      const parsedGst = typeof item.gstPercent === 'number' && !isNaN(item.gstPercent) ? item.gstPercent : parseFloat(item.gstPercent);
+
+      return {
+        name: item.name ? String(item.name).trim() : 'Unknown Product',
+        composition: item.composition ? String(item.composition).trim() : '',
+        hsnCode: item.hsnCode ? String(item.hsnCode).trim() : '',
+        batchNo: item.batchNo ? String(item.batchNo).trim() : `B-${Date.now().toString().slice(-4)}`,
+        expiryDate: item.expiryDate ? parseExpiryDate(item.expiryDate) || item.expiryDate : null,
+        qty: !isNaN(parsedQty) && parsedQty > 0 ? parsedQty : 1,
+        purchaseRate: !isNaN(parsedRate) && parsedRate >= 0 ? parsedRate : 0,
+        mrp: !isNaN(parsedMrp) && parsedMrp >= 0 ? parsedMrp : 0,
+        gstPercent: !isNaN(parsedGst) && parsedGst >= 0 ? parsedGst : 12,
+        confidence: ['high', 'low'].includes(item.confidence) ? item.confidence : 'low',
+      };
+    });
 
     // Server-side De-duplication Safety Net:
     // Merge items sharing identical batchNo AND purchaseRate

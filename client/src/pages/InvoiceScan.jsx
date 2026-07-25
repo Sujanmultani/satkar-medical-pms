@@ -449,20 +449,22 @@ export function InvoiceScan() {
 
               {/* Table */}
               <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left border-collapse min-w-[1200px]">
+              {/* Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left border-collapse min-w-[1450px]">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200 text-gray-700 font-mono uppercase text-[10px]">
                       <th className="py-2.5 px-2 text-center w-10">Scan</th>
-                      <th className="py-2.5 px-3 min-w-[240px]">Item Name *</th>
-                      {storeType === 'medical' && <th className="py-2.5 px-3 min-w-[180px]">Composition</th>}
-                      <th className="py-2.5 px-2 w-28">HSN Code</th>
-                      <th className="py-2.5 px-3 w-32">Batch No *</th>
-                      <th className="py-2.5 px-3 w-36">Expiry Date {storeType === 'medical' ? '*' : ''}</th>
-                      <th className="py-2.5 px-2 text-center w-16">Qty *</th>
-                      <th className="py-2.5 px-2 text-right w-24">P.Rate (₹)</th>
-                      <th className="py-2.5 px-2 text-right w-24">MRP (₹)</th>
-                      <th className="py-2.5 px-2 text-center w-24">GST %</th>
-                      <th className="py-2.5 px-3 text-right w-28">Total (₹)</th>
+                      <th className="py-2.5 px-3 min-w-[260px] w-72">Item Name *</th>
+                      {storeType === 'medical' && <th className="py-2.5 px-3 min-w-[220px] w-64">Composition</th>}
+                      <th className="py-2.5 px-2 min-w-[110px] w-28">HSN Code</th>
+                      <th className="py-2.5 px-3 min-w-[130px] w-36">Batch No *</th>
+                      <th className="py-2.5 px-3 min-w-[140px] w-36">Expiry Date {storeType === 'medical' ? '*' : ''}</th>
+                      <th className="py-2.5 px-2 text-center min-w-[80px] w-20">Qty *</th>
+                      <th className="py-2.5 px-2 text-right min-w-[100px] w-28">P.Rate (₹)</th>
+                      <th className="py-2.5 px-2 text-right min-w-[100px] w-28">MRP (₹)</th>
+                      <th className="py-2.5 px-2 text-center min-w-[110px] w-28">GST %</th>
+                      <th className="py-2.5 px-3 text-right min-w-[120px] w-32">Total (₹)</th>
                       <th className="py-2.5 px-2 text-center w-10">Del</th>
                     </tr>
                   </thead>
@@ -496,24 +498,24 @@ export function InvoiceScan() {
                           </td>
 
                           {/* Item Name */}
-                          <td className="py-2 px-2 min-w-[240px]">
+                          <td className="py-2 px-2 min-w-[260px]">
                             <Input
-                              value={item.name}
+                              value={item.name || ''}
                               onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
                               placeholder="Medicine Name"
-                              className="h-8 text-xs font-semibold text-primary min-w-[230px]"
+                              className="h-8 text-xs font-semibold text-primary w-full min-w-[250px]"
                             />
                           </td>
 
                           {/* Composition */}
                           {storeType === 'medical' && (
-                            <td className="py-2 px-2">
+                            <td className="py-2 px-2 min-w-[220px]">
                               <div className="relative">
                                 <Input
                                   value={item.composition || ''}
                                   onChange={(e) => handleItemChange(idx, 'composition', e.target.value)}
                                   placeholder="Salt / Composition"
-                                  className={`h-8 text-xs ${item.compositionSource === 'auto-filled' ? 'pr-14 bg-teal-50/40' : ''}`}
+                                  className={`h-8 text-xs w-full min-w-[210px] ${item.compositionSource === 'auto-filled' ? 'pr-14 bg-teal-50/40' : ''}`}
                                 />
                                 {item.compositionSource === 'auto-filled' && (
                                   <span 
@@ -529,80 +531,80 @@ export function InvoiceScan() {
                           )}
 
                           {/* HSN Code */}
-                          <td className="py-2 px-2">
+                          <td className="py-2 px-2 min-w-[110px]">
                             <Input
                               value={item.hsnCode || ''}
                               onChange={(e) => handleItemChange(idx, 'hsnCode', e.target.value)}
                               placeholder="HSN Code"
-                              className="h-8 text-xs font-mono"
+                              className="h-8 text-xs font-mono w-full min-w-[100px]"
                             />
                           </td>
 
                           {/* Batch No */}
-                          <td className="py-2 px-2">
+                          <td className="py-2 px-2 min-w-[130px]">
                             <Input
                               value={item.batchNo || ''}
                               onChange={(e) => handleItemChange(idx, 'batchNo', e.target.value)}
                               placeholder="Batch No"
-                              className="h-8 text-xs font-mono font-semibold"
+                              className="h-8 text-xs font-mono font-semibold w-full min-w-[120px]"
                             />
                           </td>
 
                           {/* Expiry Date */}
-                          <td className="py-2 px-2">
+                          <td className="py-2 px-2 min-w-[140px]">
                             <Input
                               type="date"
                               value={item.expiryDate || ''}
                               onChange={(e) => handleItemChange(idx, 'expiryDate', e.target.value)}
                               placeholder={storeType === 'provision' ? 'Optional' : ''}
-                              className="h-8 text-xs font-mono"
+                              className="h-8 text-xs font-mono w-full min-w-[130px]"
                             />
                           </td>
 
                           {/* Qty */}
-                          <td className="py-2 px-2">
+                          <td className="py-2 px-2 min-w-[80px]">
                             <Input
                               type="number"
                               min="0"
-                              value={item.qty}
+                              value={item.qty !== undefined && item.qty !== null ? item.qty : ''}
                               onChange={(e) => handleItemChange(idx, 'qty', e.target.value)}
-                              className="h-8 text-xs font-mono text-center font-bold"
+                              className="h-8 text-xs font-mono text-center font-bold w-full min-w-[65px]"
                             />
                           </td>
 
                           {/* Purchase Rate */}
-                          <td className="py-2 px-2">
+                          <td className="py-2 px-2 min-w-[100px]">
                             <Input
                               type="number"
                               step="0.01"
                               min="0"
-                              value={item.purchaseRate}
+                              value={item.purchaseRate !== undefined && item.purchaseRate !== null ? item.purchaseRate : ''}
                               onChange={(e) => handleItemChange(idx, 'purchaseRate', e.target.value)}
-                              className="h-8 text-xs font-mono text-right"
+                              className="h-8 text-xs font-mono text-right w-full min-w-[85px]"
                             />
                           </td>
 
                           {/* MRP */}
-                          <td className="py-2 px-2">
+                          <td className="py-2 px-2 min-w-[100px]">
                             <Input
                               type="number"
                               step="0.01"
                               min="0"
-                              value={item.mrp}
+                              value={item.mrp !== undefined && item.mrp !== null ? item.mrp : ''}
                               onChange={(e) => handleItemChange(idx, 'mrp', e.target.value)}
-                              className="h-8 text-xs font-mono text-right font-medium"
+                              className="h-8 text-xs font-mono text-right font-medium w-full min-w-[85px]"
                             />
                           </td>
 
                           {/* GST % with CGST / SGST sub-text */}
-                          <td className="py-2 px-2 text-center">
+                          <td className="py-2 px-2 min-w-[110px] text-center">
                             <Input
                               type="number"
                               step="0.1"
                               min="0"
-                              value={item.gstPercent}
+                              value={item.gstPercent !== undefined && item.gstPercent !== null ? item.gstPercent : ''}
                               onChange={(e) => handleItemChange(idx, 'gstPercent', e.target.value)}
-                              className="h-8 text-xs font-mono text-center"
+                              className="h-8 text-xs font-mono text-center w-full min-w-[85px] mx-auto"
                             />
                             <span className="block text-[9px] font-mono text-muted mt-0.5 whitespace-nowrap">
                               {halfGst}%C + {halfGst}%S
@@ -610,12 +612,12 @@ export function InvoiceScan() {
                           </td>
 
                           {/* Per-row Total */}
-                          <td className="py-2 px-3 text-right font-mono font-bold text-gray-900 text-xs">
+                          <td className="py-2 px-3 min-w-[120px] text-right font-mono font-bold text-gray-900 text-xs">
                             ₹{lineTotal.toFixed(2)}
                           </td>
 
                           {/* Delete Row */}
-                          <td className="py-2 px-2 text-center">
+                          <td className="py-2 px-2 text-center w-10">
                             <button
                               type="button"
                               onClick={() => removeRow(idx)}
