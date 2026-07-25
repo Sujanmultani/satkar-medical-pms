@@ -20,14 +20,25 @@ const seedData = async () => {
     await connectDB();
 
     const resetMode = process.argv.includes('--reset');
-    if (resetMode) {
-      console.log('[Seed] Reset flag detected. Clearing Item, Batch, Bill, Return, and Supplier collections...');
+    const clearOnly = process.argv.includes('--clear') || process.argv.includes('--clear-all') || process.argv.includes('--reset-only');
+
+    if (resetMode || clearOnly) {
+      console.log('[Seed] Clear flag detected. Clearing Item, Batch, Bill, Return, Supplier, and Invoice collections...');
       await Item.deleteMany({});
       await Batch.deleteMany({});
       await Bill.deleteMany({});
       await Return.deleteMany({});
       await Supplier.deleteMany({});
-      console.log('[Seed] Existing transactional & inventory data cleared cleanly.');
+      
+      const Invoice = mongoose.models.Invoice || require('../models/Invoice.js');
+      await Invoice.deleteMany({});
+      console.log('[Seed] All transactional & inventory database collections cleared cleanly.');
+      
+      if (clearOnly) {
+        console.log('[Seed] Database is now completely empty. Exiting without seeding new data.');
+        await mongoose.disconnect();
+        process.exit(0);
+      }
     }
 
     const now = new Date();
