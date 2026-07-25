@@ -216,8 +216,6 @@ const confirmInvoice = async (req, res, next) => {
       },
       status: 'confirmed',
     });
-      status: 'confirmed',
-    });
 
     return res.status(201).json({
       data: {
