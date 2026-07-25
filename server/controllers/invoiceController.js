@@ -109,7 +109,8 @@ const confirmInvoice = async (req, res, next) => {
 
     let createdItemsCount = 0;
     let createdBatchesCount = 0;
-    let totalInvoiceAmount = 0;
+    let totalBaseAmount = 0;
+    let totalInvoiceGst = 0;
     const invoiceItemsPayload = [];
 
     let supplierRecord = null;
@@ -117,15 +118,18 @@ const confirmInvoice = async (req, res, next) => {
       supplierRecord = await findOrCreateSupplier({ name: supplierName.trim() });
     }
 
+    const store = ['medical', 'provision'].includes(storeType) ? storeType : 'medical';
+
     for (const lineItem of items) {
       const { name, composition, category, unit, hsnCode, batchNo, expiryDate, qty, purchaseRate, mrp, gstPercent } = lineItem;
 
       if (!name || !name.trim()) continue;
       if (!batchNo || !batchNo.trim()) continue;
-      if (!expiryDate) continue;
+
+      // Expiry Date is mandatory ONLY for medical store
+      if (store === 'medical' && !expiryDate) continue;
 
       const itemNameClean = name.trim();
-      const store = ['medical', 'provision'].includes(storeType) ? storeType : 'medical';
 
       // Check if Item exists (case-insensitive regex match within same storeType)
       let item = await Item.findOne({
@@ -144,9 +148,16 @@ const confirmInvoice = async (req, res, next) => {
         });
         createdItemsCount++;
       } else {
-        // Update composition if missing
+        let updated = false;
         if (!item.composition && composition) {
           item.composition = composition.trim();
+          updated = true;
+        }
+        if (!item.hsnCode && hsnCode) {
+          item.hsnCode = hsnCode.trim();
+          updated = true;
+        }
+        if (updated) {
           await item.save();
         }
       }
@@ -156,24 +167,30 @@ const confirmInvoice = async (req, res, next) => {
       const numMrp = Math.max(0, Number(mrp) || 0);
       const numGstPercent = Math.max(0, Number(gstPercent) || 0);
 
+      const batchExpiry = expiryDate ? new Date(expiryDate) : null;
+      const batchStatus = batchExpiry ? computeBatchStatus(batchExpiry) : 'active';
+      const lineBase = numQty * numPurchaseRate;
+      const lineGst = lineBase * (numGstPercent / 100);
+
       // Create Batch
       const batch = await Batch.create({
         itemId: item._id,
         supplierId: supplierRecord ? supplierRecord._id : undefined,
         batchNo: batchNo.trim(),
-        expiryDate: new Date(expiryDate),
+        mfgDate: lineItem.mfgDate ? new Date(lineItem.mfgDate) : null,
+        expiryDate: batchExpiry,
         qty: numQty,
         purchaseRate: numPurchaseRate,
         mrp: numMrp,
         gstPercent: numGstPercent,
-        status: computeBatchStatus(expiryDate),
+        status: batchStatus,
         paymentStatus: 'pending',
-        amountDue: numQty * numPurchaseRate,
+        amountDue: lineBase,
       });
 
       createdBatchesCount++;
-      const lineTotal = numQty * numPurchaseRate;
-      totalInvoiceAmount += lineTotal;
+      totalBaseAmount += lineBase;
+      totalInvoiceGst += lineGst;
 
       invoiceItemsPayload.push({
         batchId: batch._id,
@@ -181,13 +198,24 @@ const confirmInvoice = async (req, res, next) => {
       });
     }
 
+    const totalInvoiceGrand = totalBaseAmount + totalInvoiceGst;
+    const totalCgst = Math.round((totalInvoiceGst / 2) * 100) / 100;
+    const totalSgst = Math.round((totalInvoiceGst / 2) * 100) / 100;
+
     // Save Invoice Record
     const invoiceRecord = await Invoice.create({
       supplierName: supplierName ? supplierName.trim() : 'Unspecified Supplier',
       invoiceNo: invoiceNo ? invoiceNo.trim() : `INV-${Date.now().toString().slice(-6)}`,
       invoiceDate: invoiceDate ? new Date(invoiceDate) : new Date(),
       items: invoiceItemsPayload,
-      totalAmount: Math.round(totalInvoiceAmount * 100) / 100,
+      totalAmount: Math.round(totalInvoiceGrand * 100) / 100,
+      gstBreakdown: {
+        cgst: totalCgst,
+        sgst: totalSgst,
+        totalGst: Math.round(totalInvoiceGst * 100) / 100,
+      },
+      status: 'confirmed',
+    });
       status: 'confirmed',
     });
 

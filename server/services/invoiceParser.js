@@ -89,6 +89,7 @@ Analyze the attached invoice image and extract structured JSON data according to
    - For each real product line, extract:
      - name: Medicine/product brand name (e.g., "IMOXCL CLAV 500 TAB", "ZEDEX COUGH SYP").
      - composition: Set to null (unless salt name is explicitly printed in parentheses on the line).
+     - hsnCode: HSN/SAC code if printed (numeric or alphanumeric, e.g. "30049099", "1512", or null).
      - batchNo: Batch alphanumeric code (e.g., "BRND01", "D1362107", "CA1S15", "1TX2501").
      - expiryDate: Expiry date as YYYY-MM-DD (convert bare MM/YY or MM/YYYY to last day of month, e.g. "06/27" -> "2027-06-30").
      - qty: Number of packs/units purchased (integer, default 1).
@@ -111,6 +112,7 @@ OUTPUT JSON FORMAT (Strict JSON):
     {
       "name": "String",
       "composition": null,
+      "hsnCode": "String",
       "batchNo": "String",
       "expiryDate": "YYYY-MM-DD",
       "qty": 1,
@@ -157,6 +159,7 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
     const rawItems = (parsedData.items || []).map((item) => ({
       name: item.name ? String(item.name).trim() : 'Unknown Product',
       composition: item.composition ? String(item.composition).trim() : '',
+      hsnCode: item.hsnCode ? String(item.hsnCode).trim() : '',
       batchNo: item.batchNo ? String(item.batchNo).trim() : `B-${Date.now().toString().slice(-4)}`,
       expiryDate: item.expiryDate ? parseExpiryDate(item.expiryDate) || item.expiryDate : null,
       qty: Number(item.qty) || 1,
@@ -183,9 +186,12 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
         if (item.name.length > existing.name.length) {
           existing.name = item.name;
         }
-        // Keep non-empty composition if available
+        // Keep non-empty composition / hsnCode if available
         if (!existing.composition && item.composition) {
           existing.composition = item.composition;
+        }
+        if (!existing.hsnCode && item.hsnCode) {
+          existing.hsnCode = item.hsnCode;
         }
         // Retain max qty & mrp
         existing.qty = Math.max(existing.qty, item.qty);

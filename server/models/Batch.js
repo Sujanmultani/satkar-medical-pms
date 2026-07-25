@@ -23,7 +23,6 @@ const batchSchema = new mongoose.Schema(
     },
     expiryDate: {
       type: Date,
-      required: true,
       index: true,
     },
     qty: {

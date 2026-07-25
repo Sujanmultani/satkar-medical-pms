@@ -191,8 +191,8 @@ export function InvoiceScan() {
         alert(`Row #${i + 1}: Batch number is required for "${item.name}".`);
         return;
       }
-      if (!item.expiryDate) {
-        alert(`Row #${i + 1}: Expiry date is required for "${item.name}".`);
+      if (storeType === 'medical' && !item.expiryDate) {
+        alert(`Row #${i + 1}: Expiry date is required for Medical Store item "${item.name}".`);
         return;
       }
     }
@@ -217,7 +217,7 @@ export function InvoiceScan() {
     }
   };
 
-  // Calculate totals (Base Amount + GST = Total Calculated Amount)
+  // Calculate totals (Base Amount + CGST + SGST = Total Calculated Amount)
   const baseCalculatedAmount = items.reduce((sum, item) => {
     const qty = Number(item.qty) || 0;
     const rate = Number(item.purchaseRate) || 0;
@@ -231,6 +231,8 @@ export function InvoiceScan() {
     return sum + (qty * rate * (gstPercent / 100));
   }, 0);
 
+  const totalCgstAmount = totalGstAmount / 2;
+  const totalSgstAmount = totalGstAmount / 2;
   const totalCalculatedAmount = baseCalculatedAmount + totalGstAmount;
 
   return (
@@ -431,164 +433,197 @@ export function InvoiceScan() {
                 <table className="w-full text-xs text-left border-collapse">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200 text-gray-700 font-mono uppercase text-[10px]">
-                      <th className="py-2.5 px-2 text-center w-12">Scan</th>
+                      <th className="py-2.5 px-2 text-center w-10">Scan</th>
                       <th className="py-2.5 px-3">Item Name *</th>
                       {storeType === 'medical' && <th className="py-2.5 px-3">Composition</th>}
+                      <th className="py-2.5 px-2 w-28">HSN Code</th>
                       <th className="py-2.5 px-3 w-32">Batch No *</th>
-                      <th className="py-2.5 px-3 w-36">Expiry Date *</th>
-                      <th className="py-2.5 px-2 text-center w-20">Qty *</th>
+                      <th className="py-2.5 px-3 w-36">Expiry Date {storeType === 'medical' ? '*' : ''}</th>
+                      <th className="py-2.5 px-2 text-center w-16">Qty *</th>
                       <th className="py-2.5 px-2 text-right w-24">P.Rate (₹)</th>
                       <th className="py-2.5 px-2 text-right w-24">MRP (₹)</th>
-                      <th className="py-2.5 px-2 text-center w-20">GST %</th>
-                      <th className="py-2.5 px-2 text-center w-12">Del</th>
+                      <th className="py-2.5 px-2 text-center w-24">GST %</th>
+                      <th className="py-2.5 px-3 text-right w-28">Total (₹)</th>
+                      <th className="py-2.5 px-2 text-center w-10">Del</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {items.map((item, idx) => (
-                      <tr
-                        key={idx}
-                        className={`transition-colors hover:bg-gray-50/80 ${
-                          item.confidence === 'low' ? 'bg-amber-50/40 border-l-4 border-l-amber-400' : ''
-                        }`}
-                      >
-                        {/* Status/Confidence */}
-                        <td className="py-2 px-2 text-center">
-                          {item.confidence === 'high' ? (
-                            <span title="High Confidence Extraction">
-                              <CheckCircle2 className="w-4 h-4 text-teal-600 inline" />
-                            </span>
-                          ) : (
-                            <span title="Low Confidence - Please verify">
-                              <AlertTriangle className="w-4 h-4 text-amber-500 inline animate-pulse" />
-                            </span>
-                          )}
-                        </td>
+                    {items.map((item, idx) => {
+                      const lineQty = Number(item.qty) || 0;
+                      const lineRate = Number(item.purchaseRate) || 0;
+                      const lineGst = Number(item.gstPercent) || 0;
+                      const lineBase = lineQty * lineRate;
+                      const lineTotal = lineBase * (1 + lineGst / 100);
+                      const halfGst = (lineGst / 2).toFixed(1);
 
-                        {/* Item Name */}
-                        <td className="py-2 px-2">
-                          <Input
-                            value={item.name}
-                            onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
-                            placeholder="Medicine Name"
-                            className="h-8 text-xs font-semibold text-primary"
-                          />
-                        </td>
-
-                        {/* Composition */}
-                        {storeType === 'medical' && (
-                          <td className="py-2 px-2">
-                            <div className="relative">
-                              <Input
-                                value={item.composition || ''}
-                                onChange={(e) => handleItemChange(idx, 'composition', e.target.value)}
-                                placeholder="Salt / Composition"
-                                className={`h-8 text-xs ${item.compositionSource === 'auto-filled' ? 'pr-14 bg-teal-50/40' : ''}`}
-                              />
-                              {item.compositionSource === 'auto-filled' && (
-                                <span 
-                                  title="Auto-filled from existing medicine history"
-                                  className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[9px] font-mono text-teal-700 bg-teal-100/90 px-1 py-0.5 rounded border border-teal-300 pointer-events-none"
-                                >
-                                  <Sparkles className="w-2.5 h-2.5 text-teal-600" />
-                                  <span>Auto</span>
-                                </span>
-                              )}
-                            </div>
+                      return (
+                        <tr
+                          key={idx}
+                          className={`transition-colors hover:bg-gray-50/80 ${
+                            item.confidence === 'low' ? 'bg-amber-50/40 border-l-4 border-l-amber-400' : ''
+                          }`}
+                        >
+                          {/* Status/Confidence */}
+                          <td className="py-2 px-2 text-center">
+                            {item.confidence === 'high' ? (
+                              <span title="High Confidence Extraction">
+                                <CheckCircle2 className="w-4 h-4 text-teal-600 inline" />
+                              </span>
+                            ) : (
+                              <span title="Low Confidence - Please verify">
+                                <AlertTriangle className="w-4 h-4 text-amber-500 inline animate-pulse" />
+                              </span>
+                            )}
                           </td>
-                        )}
 
-                        {/* Batch No */}
-                        <td className="py-2 px-2">
-                          <Input
-                            value={item.batchNo || ''}
-                            onChange={(e) => handleItemChange(idx, 'batchNo', e.target.value)}
-                            placeholder="Batch No"
-                            className="h-8 text-xs font-mono font-semibold"
-                          />
-                        </td>
+                          {/* Item Name */}
+                          <td className="py-2 px-2">
+                            <Input
+                              value={item.name}
+                              onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
+                              placeholder="Medicine Name"
+                              className="h-8 text-xs font-semibold text-primary"
+                            />
+                          </td>
 
-                        {/* Expiry Date */}
-                        <td className="py-2 px-2">
-                          <Input
-                            type="date"
-                            value={item.expiryDate || ''}
-                            onChange={(e) => handleItemChange(idx, 'expiryDate', e.target.value)}
-                            className="h-8 text-xs font-mono"
-                          />
-                        </td>
+                          {/* Composition */}
+                          {storeType === 'medical' && (
+                            <td className="py-2 px-2">
+                              <div className="relative">
+                                <Input
+                                  value={item.composition || ''}
+                                  onChange={(e) => handleItemChange(idx, 'composition', e.target.value)}
+                                  placeholder="Salt / Composition"
+                                  className={`h-8 text-xs ${item.compositionSource === 'auto-filled' ? 'pr-14 bg-teal-50/40' : ''}`}
+                                />
+                                {item.compositionSource === 'auto-filled' && (
+                                  <span 
+                                    title="Auto-filled from existing medicine history"
+                                    className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[9px] font-mono text-teal-700 bg-teal-100/90 px-1 py-0.5 rounded border border-teal-300 pointer-events-none"
+                                  >
+                                    <Sparkles className="w-2.5 h-2.5 text-teal-600" />
+                                    <span>Auto</span>
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          )}
 
-                        {/* Qty */}
-                        <td className="py-2 px-2">
-                          <Input
-                            type="number"
-                            min="0"
-                            value={item.qty}
-                            onChange={(e) => handleItemChange(idx, 'qty', e.target.value)}
-                            className="h-8 text-xs font-mono text-center font-bold"
-                          />
-                        </td>
+                          {/* HSN Code */}
+                          <td className="py-2 px-2">
+                            <Input
+                              value={item.hsnCode || ''}
+                              onChange={(e) => handleItemChange(idx, 'hsnCode', e.target.value)}
+                              placeholder="HSN Code"
+                              className="h-8 text-xs font-mono"
+                            />
+                          </td>
 
-                        {/* Purchase Rate */}
-                        <td className="py-2 px-2">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={item.purchaseRate}
-                            onChange={(e) => handleItemChange(idx, 'purchaseRate', e.target.value)}
-                            className="h-8 text-xs font-mono text-right"
-                          />
-                        </td>
+                          {/* Batch No */}
+                          <td className="py-2 px-2">
+                            <Input
+                              value={item.batchNo || ''}
+                              onChange={(e) => handleItemChange(idx, 'batchNo', e.target.value)}
+                              placeholder="Batch No"
+                              className="h-8 text-xs font-mono font-semibold"
+                            />
+                          </td>
 
-                        {/* MRP */}
-                        <td className="py-2 px-2">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={item.mrp}
-                            onChange={(e) => handleItemChange(idx, 'mrp', e.target.value)}
-                            className="h-8 text-xs font-mono text-right font-medium"
-                          />
-                        </td>
+                          {/* Expiry Date */}
+                          <td className="py-2 px-2">
+                            <Input
+                              type="date"
+                              value={item.expiryDate || ''}
+                              onChange={(e) => handleItemChange(idx, 'expiryDate', e.target.value)}
+                              placeholder={storeType === 'provision' ? 'Optional' : ''}
+                              className="h-8 text-xs font-mono"
+                            />
+                          </td>
 
-                        {/* GST % */}
-                        <td className="py-2 px-2">
-                          <Input
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            value={item.gstPercent}
-                            onChange={(e) => handleItemChange(idx, 'gstPercent', e.target.value)}
-                            className="h-8 text-xs font-mono text-center"
-                          />
-                        </td>
+                          {/* Qty */}
+                          <td className="py-2 px-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              value={item.qty}
+                              onChange={(e) => handleItemChange(idx, 'qty', e.target.value)}
+                              className="h-8 text-xs font-mono text-center font-bold"
+                            />
+                          </td>
 
-                        {/* Delete Row */}
-                        <td className="py-2 px-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() => removeRow(idx)}
-                            className="p-1 rounded text-gray-400 hover:text-error hover:bg-red-50 transition-colors"
-                            title="Remove Line Item"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                          {/* Purchase Rate */}
+                          <td className="py-2 px-2">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={item.purchaseRate}
+                              onChange={(e) => handleItemChange(idx, 'purchaseRate', e.target.value)}
+                              className="h-8 text-xs font-mono text-right"
+                            />
+                          </td>
+
+                          {/* MRP */}
+                          <td className="py-2 px-2">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={item.mrp}
+                              onChange={(e) => handleItemChange(idx, 'mrp', e.target.value)}
+                              className="h-8 text-xs font-mono text-right font-medium"
+                            />
+                          </td>
+
+                          {/* GST % with CGST / SGST sub-text */}
+                          <td className="py-2 px-2 text-center">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={item.gstPercent}
+                              onChange={(e) => handleItemChange(idx, 'gstPercent', e.target.value)}
+                              className="h-8 text-xs font-mono text-center"
+                            />
+                            <span className="block text-[9px] font-mono text-muted mt-0.5 whitespace-nowrap">
+                              {halfGst}%C + {halfGst}%S
+                            </span>
+                          </td>
+
+                          {/* Per-row Total */}
+                          <td className="py-2 px-3 text-right font-mono font-bold text-gray-900 text-xs">
+                            ₹{lineTotal.toFixed(2)}
+                          </td>
+
+                          {/* Delete Row */}
+                          <td className="py-2 px-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => removeRow(idx)}
+                              className="p-1 rounded text-gray-400 hover:text-error hover:bg-red-50 transition-colors"
+                              title="Remove Line Item"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
 
               {/* Summary Footer */}
               <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-100 bg-gray-50/50 p-4 rounded-xl">
-                <div className="text-xs text-muted font-mono flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span>Total Items: <strong className="text-primary font-bold">{items.length}</strong></span>
+                <div className="text-xs text-muted font-mono flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span>Items: <strong className="text-primary font-bold">{items.length}</strong></span>
                   <span className="hidden sm:inline text-gray-300">|</span>
                   <span>Base: <strong className="text-gray-700">₹{baseCalculatedAmount.toFixed(2)}</strong></span>
-                  <span>+ GST: <strong className="text-gray-700">₹{totalGstAmount.toFixed(2)}</strong></span>
-                  <span>= Total: <strong className="text-primary font-bold text-sm">₹{totalCalculatedAmount.toFixed(2)}</strong></span>
+                  <span>+ CGST: <strong className="text-gray-700">₹{totalCgstAmount.toFixed(2)}</strong></span>
+                  <span>+ SGST: <strong className="text-gray-700">₹{totalSgstAmount.toFixed(2)}</strong></span>
+                  <span>= GST: <strong className="text-gray-900 font-bold">₹{totalGstAmount.toFixed(2)}</strong></span>
+                  <span className="hidden sm:inline text-gray-300">|</span>
+                  <span>Grand Total: <strong className="text-primary font-bold text-sm">₹{totalCalculatedAmount.toFixed(2)}</strong></span>
                 </div>
 
                 {/* Confirm Button */}
