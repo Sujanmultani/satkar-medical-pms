@@ -467,12 +467,23 @@ export function InvoiceScan() {
                         {/* Composition */}
                         {storeType === 'medical' && (
                           <td className="py-2 px-2">
-                            <Input
-                              value={item.composition || ''}
-                              onChange={(e) => handleItemChange(idx, 'composition', e.target.value)}
-                              placeholder="Salt / Composition"
-                              className="h-8 text-xs"
-                            />
+                            <div className="relative">
+                              <Input
+                                value={item.composition || ''}
+                                onChange={(e) => handleItemChange(idx, 'composition', e.target.value)}
+                                placeholder="Salt / Composition"
+                                className={`h-8 text-xs ${item.compositionSource === 'auto-filled' ? 'pr-14 bg-teal-50/40' : ''}`}
+                              />
+                              {item.compositionSource === 'auto-filled' && (
+                                <span 
+                                  title="Auto-filled from existing medicine history"
+                                  className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[9px] font-mono text-teal-700 bg-teal-100/90 px-1 py-0.5 rounded border border-teal-300 pointer-events-none"
+                                >
+                                  <Sparkles className="w-2.5 h-2.5 text-teal-600" />
+                                  <span>Auto</span>
+                                </span>
+                              )}
+                            </div>
                           </td>
                         )}
 

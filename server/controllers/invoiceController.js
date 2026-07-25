@@ -19,6 +19,63 @@ const scanInvoice = async (req, res, next) => {
     // Call Gemini multimodal invoice parser
     const parsedData = await parseInvoiceImageWithGemini(req.file.buffer, req.file.mimetype);
 
+    // Auto-fill composition from known items in database
+    const targetStore = ['medical', 'provision'].includes(req.body.storeType) ? req.body.storeType : 'medical';
+
+    try {
+      const existingItems = await Item.find({
+        storeType: targetStore,
+        composition: { $exists: true, $ne: '' },
+      })
+        .select('name composition')
+        .lean();
+
+      if (existingItems.length > 0) {
+        const itemMap = new Map();
+        existingItems.forEach((i) => {
+          if (i.name && i.composition) {
+            const key = i.name.trim().toLowerCase().replace(/\s+/g, ' ');
+            if (!itemMap.has(key)) {
+              itemMap.set(key, i.composition.trim());
+            }
+          }
+        });
+
+        parsedData.items = (parsedData.items || []).map((item) => {
+          if (!item.composition || !item.composition.trim()) {
+            const itemKey = (item.name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+            // Exact normalized name match
+            if (itemKey && itemMap.has(itemKey)) {
+              return {
+                ...item,
+                composition: itemMap.get(itemKey),
+                compositionSource: 'auto-filled',
+              };
+            }
+
+            // Substring / partial match
+            const matched = existingItems.find((ex) => {
+              if (!ex.name) return false;
+              const exKey = ex.name.trim().toLowerCase().replace(/\s+/g, ' ');
+              return exKey.length >= 3 && itemKey.length >= 3 && (exKey.includes(itemKey) || itemKey.includes(exKey));
+            });
+
+            if (matched) {
+              return {
+                ...item,
+                composition: matched.composition.trim(),
+                compositionSource: 'auto-filled',
+              };
+            }
+          }
+          return item;
+        });
+      }
+    } catch (dbErr) {
+      console.warn('[Auto-fill Warning] Failed to lookup existing item compositions:', dbErr.message);
+    }
+
     return res.status(200).json({
       rawText: 'Gemini Multimodal Structured Extraction',
       supplierName: parsedData.supplierName,
