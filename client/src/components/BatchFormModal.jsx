@@ -55,7 +55,10 @@ export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initial
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const cleanValue = typeof value === 'string' && value.length > 1 && /^0\d/.test(value)
+      ? value.replace(/^0+/, '')
+      : value;
+    setFormData((prev) => ({ ...prev, [name]: cleanValue }));
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }));
     }

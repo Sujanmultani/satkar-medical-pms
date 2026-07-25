@@ -145,9 +145,13 @@ export function InvoiceScan() {
 
   // Row Manipulation
   const handleItemChange = (index, field, value) => {
+    const cleanValue = typeof value === 'string' && value.length > 1 && /^0\d/.test(value)
+      ? value.replace(/^0+/, '')
+      : value;
+
     setItems((prev) => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
+      updated[index] = { ...updated[index], [field]: cleanValue };
       return updated;
     });
   };

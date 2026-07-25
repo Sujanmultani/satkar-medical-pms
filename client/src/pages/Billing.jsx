@@ -110,7 +110,7 @@ export function Billing() {
           batch,
           qty: 1,
           rate: batch.mrp || 0,
-          gst: batch.gstPercent || 0,
+          gst: 0,
         },
       ]);
     }
@@ -125,8 +125,13 @@ export function Billing() {
     const updated = [...lineItems];
     const itemLine = updated[index];
 
+    // Strip leading zeros if user typed digits after initial zero (e.g. "05" -> "5")
+    const cleanValue = typeof value === 'string' && value.length > 1 && /^0\d/.test(value)
+      ? value.replace(/^0+/, '')
+      : value;
+
     if (field === 'qty') {
-      const newQty = Number(value);
+      const newQty = Number(cleanValue);
       if (newQty > itemLine.batch.qty) {
         setErrorMessage(`Quantity exceeds stock limit (${itemLine.batch.qty}) for batch ${itemLine.batch.batchNo}.`);
       } else {
@@ -134,9 +139,9 @@ export function Billing() {
       }
       itemLine.qty = newQty;
     } else if (field === 'rate') {
-      itemLine.rate = Number(value) || 0;
+      itemLine.rate = Number(cleanValue) || 0;
     } else if (field === 'gst') {
-      itemLine.gst = Number(value) || 0;
+      itemLine.gst = Number(cleanValue) || 0;
     }
 
     setLineItems(updated);
