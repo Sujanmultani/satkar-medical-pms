@@ -99,7 +99,8 @@ const scanInvoice = async (req, res, next) => {
 // @access  Private
 const confirmInvoice = async (req, res, next) => {
   try {
-    const { supplierName, invoiceNo, invoiceDate, storeType = 'medical', items } = req.body;
+    const { supplierName, invoiceNo, invoiceDate, storeType = 'medical', paymentStatus = 'pending', items } = req.body;
+    const isPaid = paymentStatus === 'paid';
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({
@@ -184,8 +185,8 @@ const confirmInvoice = async (req, res, next) => {
         mrp: numMrp,
         gstPercent: numGstPercent,
         status: batchStatus,
-        paymentStatus: 'pending',
-        amountDue: lineBase,
+        paymentStatus: isPaid ? 'paid' : 'pending',
+        amountDue: isPaid ? 0 : lineBase,
       });
 
       createdBatchesCount++;

@@ -43,6 +43,7 @@ export function InvoiceScan() {
   const [invoiceNo, setInvoiceNo] = useState('');
   const [invoiceDate, setInvoiceDate] = useState('');
   const [storeType, setStoreType] = useState('medical');
+  const [paymentStatus, setPaymentStatus] = useState('pending');
   const [items, setItems] = useState([]);
   const [rawOcrText, setRawOcrText] = useState('');
   const [successData, setSuccessData] = useState(null);
@@ -204,6 +205,7 @@ export function InvoiceScan() {
         invoiceNo,
         invoiceDate,
         storeType,
+        paymentStatus,
         items,
       });
 
@@ -354,7 +356,7 @@ export function InvoiceScan() {
                 <span>Invoice Header Details</span>
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div>
                   <Label htmlFor="supplierName">Supplier / Distributor Name</Label>
                   <SupplierAutocomplete
@@ -400,6 +402,19 @@ export function InvoiceScan() {
                     <option value="provision">Provision Store</option>
                   </Select>
                 </div>
+
+                <div>
+                  <Label htmlFor="paymentStatus">Payment Status</Label>
+                  <Select
+                    id="paymentStatus"
+                    value={paymentStatus}
+                    onChange={(e) => setPaymentStatus(e.target.value)}
+                    className={`mt-1 font-semibold ${paymentStatus === 'paid' ? 'text-teal-800 bg-teal-50 border-teal-300' : 'text-amber-800 bg-amber-50 border-amber-300'}`}
+                  >
+                    <option value="pending">Pending (Unpaid)</option>
+                    <option value="paid">Paid (Fully Settled)</option>
+                  </Select>
+                </div>
               </div>
             </Card>
 
@@ -430,12 +445,12 @@ export function InvoiceScan() {
 
               {/* Table */}
               <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left border-collapse">
+                <table className="w-full text-xs text-left border-collapse min-w-[1200px]">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200 text-gray-700 font-mono uppercase text-[10px]">
                       <th className="py-2.5 px-2 text-center w-10">Scan</th>
-                      <th className="py-2.5 px-3">Item Name *</th>
-                      {storeType === 'medical' && <th className="py-2.5 px-3">Composition</th>}
+                      <th className="py-2.5 px-3 min-w-[240px]">Item Name *</th>
+                      {storeType === 'medical' && <th className="py-2.5 px-3 min-w-[180px]">Composition</th>}
                       <th className="py-2.5 px-2 w-28">HSN Code</th>
                       <th className="py-2.5 px-3 w-32">Batch No *</th>
                       <th className="py-2.5 px-3 w-36">Expiry Date {storeType === 'medical' ? '*' : ''}</th>
@@ -477,12 +492,12 @@ export function InvoiceScan() {
                           </td>
 
                           {/* Item Name */}
-                          <td className="py-2 px-2">
+                          <td className="py-2 px-2 min-w-[240px]">
                             <Input
                               value={item.name}
                               onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
                               placeholder="Medicine Name"
-                              className="h-8 text-xs font-semibold text-primary"
+                              className="h-8 text-xs font-semibold text-primary min-w-[230px]"
                             />
                           </td>
 
