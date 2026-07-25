@@ -97,6 +97,11 @@ Analyze the attached invoice image and extract structured JSON data according to
      - gstPercent: GST percentage (number, e.g. 5, 12, 18, 6.9, 13.54).
      - confidence: "high" if name, batchNo, expiryDate, and rate/mrp are clearly legible; otherwise "low".
 
+3. STRICT DUPLICATE PREVENTION & MERGING RULES:
+   - Each physical purchase line item on the invoice must appear EXACTLY ONCE in the JSON output array.
+   - If an item's description or brand name appears split across adjacent text fragments (e.g., "APIDRA CARTRIDGE" and "APIDRA" with identical batch number and rate/MRP), treat them as THE SAME SINGLE ITEM, NOT TWO SEPARATE ITEMS.
+   - If two candidate lines share the SAME batch number AND the SAME purchase rate/MRP, merge them into a single line item with the most complete product name, and set confidence to "low".
+
 OUTPUT JSON FORMAT (Strict JSON):
 {
   "supplierName": "String",
@@ -149,7 +154,7 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
     const parsedData = JSON.parse(textOutput);
 
     // Post-process and normalize fields
-    const items = (parsedData.items || []).map((item) => ({
+    const rawItems = (parsedData.items || []).map((item) => ({
       name: item.name ? String(item.name).trim() : 'Unknown Product',
       composition: item.composition ? String(item.composition).trim() : '',
       batchNo: item.batchNo ? String(item.batchNo).trim() : `B-${Date.now().toString().slice(-4)}`,
@@ -160,6 +165,40 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
       gstPercent: Number(item.gstPercent) || 12,
       confidence: ['high', 'low'].includes(item.confidence) ? item.confidence : 'low',
     }));
+
+    // Server-side De-duplication Safety Net:
+    // Merge items sharing identical batchNo AND purchaseRate
+    const items = [];
+    const seenMap = new Map();
+
+    for (const item of rawItems) {
+      const normalizedBatch = item.batchNo.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const dedupKey = `${normalizedBatch}_${item.purchaseRate.toFixed(2)}`;
+
+      if (normalizedBatch && seenMap.has(dedupKey)) {
+        const existingIdx = seenMap.get(dedupKey);
+        const existing = items[existingIdx];
+
+        // Merge: keep longer/more complete product name
+        if (item.name.length > existing.name.length) {
+          existing.name = item.name;
+        }
+        // Keep non-empty composition if available
+        if (!existing.composition && item.composition) {
+          existing.composition = item.composition;
+        }
+        // Retain max qty & mrp
+        existing.qty = Math.max(existing.qty, item.qty);
+        existing.mrp = Math.max(existing.mrp, item.mrp);
+        // Assign low confidence so human admin double-checks during confirmation
+        existing.confidence = 'low';
+      } else {
+        if (normalizedBatch) {
+          seenMap.set(dedupKey, items.length);
+        }
+        items.push({ ...item });
+      }
+    }
 
     return {
       supplierName: parsedData.supplierName ? String(parsedData.supplierName).trim() : 'Pharma Distributor',
