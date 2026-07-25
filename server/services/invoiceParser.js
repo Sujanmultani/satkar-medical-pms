@@ -15,8 +15,8 @@ const getGenerativeModel = () => {
     vertexAIClient = new VertexAI({ project, location });
   }
 
-  // Use Gemini multimodal model (gemini-1.5-flash / gemini-2.5-flash)
-  const modelName = process.env.GEMINI_MODEL_NAME || 'gemini-1.5-flash';
+  // Use Gemini multimodal model (gemini-2.5-flash)
+  const modelName = process.env.GEMINI_MODEL_NAME || 'gemini-2.5-flash';
   return vertexAIClient.getGenerativeModel({
     model: modelName,
     generationConfig: {
