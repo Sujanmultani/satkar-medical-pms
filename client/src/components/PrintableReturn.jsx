@@ -191,5 +191,3 @@ export function PrintableReturn({ isOpen, onClose, returnRecord, businessInfo })
 }
 
 export default PrintableReturn;
-
-export default PrintableReturn;
