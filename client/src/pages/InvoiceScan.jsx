@@ -217,11 +217,21 @@ export function InvoiceScan() {
     }
   };
 
-  // Calculate totals
-  const totalCalculatedAmount = items.reduce(
-    (sum, item) => sum + (Number(item.qty) || 0) * (Number(item.purchaseRate) || 0),
-    0
-  );
+  // Calculate totals (Base Amount + GST = Total Calculated Amount)
+  const baseCalculatedAmount = items.reduce((sum, item) => {
+    const qty = Number(item.qty) || 0;
+    const rate = Number(item.purchaseRate) || 0;
+    return sum + (qty * rate);
+  }, 0);
+
+  const totalGstAmount = items.reduce((sum, item) => {
+    const qty = Number(item.qty) || 0;
+    const rate = Number(item.purchaseRate) || 0;
+    const gstPercent = Number(item.gstPercent) || 0;
+    return sum + (qty * rate * (gstPercent / 100));
+  }, 0);
+
+  const totalCalculatedAmount = baseCalculatedAmount + totalGstAmount;
 
   return (
     <div className="relative min-h-screen p-6 md:p-8 bg-background">
@@ -573,9 +583,12 @@ export function InvoiceScan() {
 
               {/* Summary Footer */}
               <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-100 bg-gray-50/50 p-4 rounded-xl">
-                <div className="text-xs text-muted font-mono space-x-4">
-                  <span>Total Items: <strong className="text-primary">{items.length}</strong></span>
-                  <span>Calculated Invoice Total: <strong className="text-text">₹{totalCalculatedAmount.toFixed(2)}</strong></span>
+                <div className="text-xs text-muted font-mono flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span>Total Items: <strong className="text-primary font-bold">{items.length}</strong></span>
+                  <span className="hidden sm:inline text-gray-300">|</span>
+                  <span>Base: <strong className="text-gray-700">₹{baseCalculatedAmount.toFixed(2)}</strong></span>
+                  <span>+ GST: <strong className="text-gray-700">₹{totalGstAmount.toFixed(2)}</strong></span>
+                  <span>= Total: <strong className="text-primary font-bold text-sm">₹{totalCalculatedAmount.toFixed(2)}</strong></span>
                 </div>
 
                 {/* Confirm Button */}
