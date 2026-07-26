@@ -79,39 +79,49 @@ You are an expert OCR AI specializing in Indian pharmacy distributor invoices (p
 Analyze the attached invoice image and extract structured JSON data according to these exact rules:
 
 1. INVOICE HEADER:
-   - supplierName: Name of the distributor/seller (e.g., "CAMBAY PHARMA AGENCIES", "ASHA MEDICAL AGENCY"). Do NOT extract the buyer name (e.g., "SATKAR MEDICAL" / "M/S: SATKAR MEDICAL").
+   - supplierName: Name of the distributor/seller (e.g., "CAMBAY PHARMA AGENCIES", "ASHA MEDICAL AGENCY"). Do NOT extract buyer name.
    - invoiceNo: Invoice/bill reference number (e.g., "INV-1092", "24-25/9981").
    - invoiceDate: Invoice date formatted as YYYY-MM-DD.
+   - printedSubtotal: Printed gross subtotal / taxable base amount before round-off or net total (number or null).
+   - printedRoundOff: Explicit printed Round Off adjustment figure if printed on invoice (number, e.g. 0.23, -0.15, or null).
+   - printedGrandTotal: Printed final Net Amount / Total payable figure for the entire invoice (number or null).
 
 2. LINE ITEMS (Medicines & Products Purchased):
    - Extract only genuine product purchase lines.
-   - EXCLUDE: Distributor address/phone/license boilerplate, disclaimers ("Subject to Jurisdiction", "FSSAI", "DL No", "SUNDAY CLOSED"), buyer address, table header rows ("EX.D/BATCH.NO", "HSN", "DESCRIPTION", "QTY", "MRP", "RATE"), tax/GST summary rows ("GST Base", "CGST", "SGST", "Total Amount"), and amount-in-words lines.
+   - EXCLUDE: Distributor address/phone/license boilerplate, disclaimers, buyer address, table header rows, tax/GST summary rows, and amount-in-words lines.
    - For each real product line, extract:
      - name: Medicine/product brand name (e.g., "IMOXCL CLAV 500 TAB", "ZEDEX COUGH SYP").
      - composition: Set to null (unless salt name is explicitly printed in parentheses on the line).
+     - category: Standardized category inferred from product name/packaging. MUST be one of: "Tablet", "Syrup", "Capsule", "Injection", "Insulin", "Ointment", "Drops", "Other".
+     - unit: Standardized packaging unit inferred from item name. MUST be one of: "strip", "bottle", "vial", "tube", "pack", "piece".
      - hsnCode: HSN/SAC code if printed (numeric or alphanumeric, e.g. "30049099", "1512", or null).
      - batchNo: Batch alphanumeric code (e.g., "BRND01", "D1362107", "CA1S15", "1TX2501").
-     - expiryDate: Expiry date as YYYY-MM-DD (convert bare MM/YY or MM/YYYY to last day of month, e.g. "06/27" -> "2027-06-30").
-     - qty: Number of packs/units actually billed and purchased on this line (integer, default 1). CRITICAL AMBIGUITY RULE: Indian pharma invoices often print 3 numbers together in packing/qty columns (e.g. "1 1 100ML", "10 TAB 1 0", or "1 0 10"). Do NOT extract the pack size (e.g., "100ML", "10TAB", "10x10") or scheme free count as 'qty'. 'qty' MUST be the actual billed count of packs/boxes purchased (typically 1, 2, 3, 5, 10). If ambiguous, mark confidence as "low".
-     - purchaseRate: Net effective purchase rate per unit POST-DISCOUNT (number). CRITICAL NET-RATE RULE: Indian pharma invoices often print two rate figures — a raw listed "RATE" and a discounted "BASE AMT" / "NET RATE" / "TAXABLE VAL" (after trade discount). Always extract or calculate the NET post-discount rate per unit (i.e. Net Taxable Value / qty), NOT the raw gross list rate, because GST is calculated on the discounted net base amount. If only one rate appears, use that rate.
+     - expiryDate: Expiry date as YYYY-MM-DD (convert bare MM/YY or MM/YYYY to last day of month).
+     - qty: Number of packs/units actually billed and purchased on this line (integer, default 1).
+     - purchaseRate: Net effective purchase rate per unit POST-DISCOUNT (number).
      - mrp: Maximum Retail Price per pack (number).
-     - gstPercent: Read the EXACT GST/tax percentage printed for THIS SPECIFIC line item on the invoice (number, e.g. 5, 12, 18, 6.9, 13.54). Look at the GST% column, or add CGST%+SGST% (e.g., 2.5%+2.5% = 5, 6%+6% = 12, 9%+9% = 18). Do NOT assume or default to 5 or 12 — read the actual printed number. If GST% is omitted or illegible for this line, return null.
-     - confidence: "high" if name, batchNo, expiryDate, rate/mrp, and gstPercent are clearly legible; set to "low" if qty packing numbers are ambiguous, or if gstPercent/net rate or any key field is missing/blurry.
+     - gstPercent: Read the EXACT GST/tax percentage printed for THIS SPECIFIC line item (number).
+     - printedLineTotal: Printed final line item amount figure if printed on this line (number or null).
+     - confidence: "high" if legible; set to "low" if ambiguous.
 
 3. STRICT DUPLICATE PREVENTION & MERGING RULES:
    - Each physical purchase line item on the invoice must appear EXACTLY ONCE in the JSON output array.
-   - If an item's description or brand name appears split across adjacent text fragments (e.g., "APIDRA CARTRIDGE" and "APIDRA" with identical batch number and rate/MRP), treat them as THE SAME SINGLE ITEM, NOT TWO SEPARATE ITEMS.
-   - If two candidate lines share the SAME batch number AND the SAME purchase rate/MRP, merge them into a single line item with the most complete product name, and set confidence to "low".
+   - Merge lines sharing identical batch number and rate/MRP.
 
 OUTPUT JSON FORMAT (Strict JSON):
 {
   "supplierName": "String",
   "invoiceNo": "String",
   "invoiceDate": "YYYY-MM-DD",
+  "printedSubtotal": null,
+  "printedRoundOff": null,
+  "printedGrandTotal": null,
   "items": [
     {
       "name": "String",
       "composition": null,
+      "category": "Tablet",
+      "unit": "strip",
       "hsnCode": "String",
       "batchNo": "String",
       "expiryDate": "YYYY-MM-DD",
@@ -119,6 +129,7 @@ OUTPUT JSON FORMAT (Strict JSON):
       "purchaseRate": 0.0,
       "mrp": 0.0,
       "gstPercent": null,
+      "printedLineTotal": null,
       "confidence": "high"
     }
   ]
@@ -138,15 +149,23 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
     const imagePart = {
       inlineData: {
         data: fileBuffer.toString('base64'),
-        mimeType: mimeType || 'image/jpeg',
+        mimeType,
       },
     };
 
-    const resp = await generativeModel.generateContent({
-      contents: [{ role: 'user', parts: [imagePart, { text: EXTRACTION_PROMPT }] }],
+    const textPart = {
+      text: EXTRACTION_PROMPT,
+    };
+
+    const response = await generativeModel.generateContent({
+      contents: [{ role: 'user', parts: [imagePart, textPart] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.1,
+      },
     });
 
-    const candidate = resp.response?.candidates?.[0];
+    const candidate = response?.response?.candidates?.[0];
     const textOutput = candidate?.content?.parts?.[0]?.text;
 
     if (!textOutput) {
@@ -155,17 +174,33 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
 
     const parsedData = JSON.parse(textOutput);
 
+    const validCategories = ['Tablet', 'Syrup', 'Capsule', 'Injection', 'Insulin', 'Ointment', 'Drops', 'Other'];
+    const validUnits = ['strip', 'bottle', 'vial', 'tube', 'pack', 'piece'];
+
     // Post-process and normalize fields
     const rawItems = (parsedData.items || []).map((item) => {
       const parsedQty = typeof item.qty === 'number' && !isNaN(item.qty) ? item.qty : parseInt(item.qty, 10);
       const parsedRate = typeof item.purchaseRate === 'number' && !isNaN(item.purchaseRate) ? item.purchaseRate : parseFloat(item.purchaseRate);
       const parsedMrp = typeof item.mrp === 'number' && !isNaN(item.mrp) ? item.mrp : parseFloat(item.mrp);
       const parsedGst = typeof item.gstPercent === 'number' && !isNaN(item.gstPercent) ? item.gstPercent : parseFloat(item.gstPercent);
+      const parsedPrintedTotal = typeof item.printedLineTotal === 'number' && !isNaN(item.printedLineTotal) ? item.printedLineTotal : parseFloat(item.printedLineTotal);
       const hasValidGst = !isNaN(parsedGst) && parsedGst >= 0;
+
+      let cat = item.category ? String(item.category).trim() : '';
+      if (!validCategories.includes(cat)) {
+        cat = 'Tablet';
+      }
+
+      let u = item.unit ? String(item.unit).trim() : '';
+      if (!validUnits.includes(u)) {
+        u = 'strip';
+      }
 
       return {
         name: item.name ? String(item.name).trim() : 'Unknown Product',
         composition: item.composition ? String(item.composition).trim() : '',
+        category: cat,
+        unit: u,
         hsnCode: item.hsnCode ? String(item.hsnCode).trim() : '',
         batchNo: item.batchNo ? String(item.batchNo).trim() : `B-${Date.now().toString().slice(-4)}`,
         expiryDate: item.expiryDate ? parseExpiryDate(item.expiryDate) || item.expiryDate : null,
@@ -173,6 +208,7 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
         purchaseRate: !isNaN(parsedRate) && parsedRate >= 0 ? parsedRate : 0,
         mrp: !isNaN(parsedMrp) && parsedMrp >= 0 ? parsedMrp : 0,
         gstPercent: hasValidGst ? parsedGst : null,
+        printedLineTotal: !isNaN(parsedPrintedTotal) && parsedPrintedTotal > 0 ? parsedPrintedTotal : null,
         confidence: (!hasValidGst || item.confidence === 'low') ? 'low' : 'high',
       };
     });
@@ -214,10 +250,17 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
       }
     }
 
+    const pSub = typeof parsedData.printedSubtotal === 'number' && !isNaN(parsedData.printedSubtotal) ? parsedData.printedSubtotal : parseFloat(parsedData.printedSubtotal);
+    const pRound = typeof parsedData.printedRoundOff === 'number' && !isNaN(parsedData.printedRoundOff) ? parsedData.printedRoundOff : parseFloat(parsedData.printedRoundOff);
+    const pGrand = typeof parsedData.printedGrandTotal === 'number' && !isNaN(parsedData.printedGrandTotal) ? parsedData.printedGrandTotal : parseFloat(parsedData.printedGrandTotal);
+
     return {
       supplierName: parsedData.supplierName ? String(parsedData.supplierName).trim() : 'Pharma Distributor',
       invoiceNo: parsedData.invoiceNo ? String(parsedData.invoiceNo).trim() : `INV-${Date.now().toString().slice(-6)}`,
       invoiceDate: parseExpiryDate(parsedData.invoiceDate) || parsedData.invoiceDate || new Date().toISOString().split('T')[0],
+      printedSubtotal: !isNaN(pSub) ? pSub : null,
+      printedRoundOff: !isNaN(pRound) ? pRound : null,
+      printedGrandTotal: !isNaN(pGrand) ? pGrand : null,
       items,
     };
   } catch (error) {

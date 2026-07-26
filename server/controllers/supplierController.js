@@ -86,20 +86,36 @@ const getSupplierById = async (req, res, next) => {
       });
     }
 
-    // Fetch all batches referencing this supplier
-    const batches = await Batch.find({ supplierId: supplier._id })
+    // Find all return records for this supplier to discover any batch IDs linked to this supplier
+    const supplierReturns = await Return.find({
+      type: 'supplier',
+      $or: [
+        { supplierId: supplier._id },
+        { supplierName: new RegExp(`^${supplier.name.trim().replace(/[/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') },
+      ],
+    }).lean();
+
+    const returnBatchIds = supplierReturns.map((r) => r.batchId).filter(Boolean);
+
+    // Fetch all batches referencing this supplier directly or via returns
+    const batches = await Batch.find({
+      $or: [
+        { supplierId: supplier._id },
+        { _id: { $in: returnBatchIds } },
+      ],
+    })
       .populate('itemId', 'name composition category unit hsnCode storeType')
       .sort({ createdAt: -1 })
       .lean();
 
-    // Fetch return records for this supplier
+    // Combined returns query
     const batchIds = batches.map((b) => b._id);
     const returns = await Return.find({
       type: 'supplier',
       $or: [
         { supplierId: supplier._id },
         { batchId: { $in: batchIds } },
-        { supplierName: new RegExp(supplier.name.trim().replace(/[/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i') },
+        { supplierName: new RegExp(`^${supplier.name.trim().replace(/[/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') },
       ],
     })
       .populate('itemId', 'name composition category unit hsnCode storeType')

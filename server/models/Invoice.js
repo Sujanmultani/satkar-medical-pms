@@ -34,6 +34,18 @@ const invoiceSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },
+    printedSubtotal: {
+      type: Number,
+      default: null,
+    },
+    printedRoundOff: {
+      type: Number,
+      default: null,
+    },
+    printedGrandTotal: {
+      type: Number,
+      default: null,
+    },
     totalAmount: {
       type: Number,
       default: 0,

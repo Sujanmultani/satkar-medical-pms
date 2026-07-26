@@ -82,7 +82,7 @@ export function PrintableReturn({ isOpen, onClose, returnRecord, businessInfo })
           {isSupplier ? (
             <>
               <p><span className="font-semibold text-gray-600">Supplier:</span> {returnRecord.supplierName || 'N/A'}</p>
-              <p><span className="font-semibold text-gray-600">Credit Note No:</span> {returnRecord.creditNoteNo || 'Pending'}</p>
+              <p><span className="font-semibold text-gray-600">Credit Note No:</span> {returnRecord.creditNoteNo || 'No credit note recorded'}</p>
             </>
           ) : (
             <>

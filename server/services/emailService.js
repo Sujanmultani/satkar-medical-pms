@@ -1,9 +1,11 @@
 const nodemailer = require('nodemailer');
+const dotenv = require('dotenv');
 
 /**
  * Creates Nodemailer transporter using SMTP credentials or Gmail settings from environment variables.
  */
 const createTransporter = () => {
+  dotenv.config();
   const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.EMAIL_PORT, 10) || 587;
   const user = process.env.EMAIL_USER || process.env.GMAIL_USER;
@@ -27,14 +29,15 @@ const createTransporter = () => {
  * @param {string} exportDateISO - Date ISO string
  * @param {Object} counts - Document counts per collection
  */
-const sendBackupEmail = async (jsonBuffer, exportDateISO, counts = {}) => {
+const sendBackupEmail = async (fileBuffer, exportDateISO, counts = {}, fileType = 'xlsx') => {
   try {
+    dotenv.config();
     const user = process.env.EMAIL_USER || process.env.GMAIL_USER;
     const pass = process.env.EMAIL_PASS || process.env.EMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASSWORD;
     const recipient = process.env.ADMIN_NOTIFICATION_EMAIL || user;
 
     if (!user || !pass || !recipient) {
-      console.warn('[Backup Email Warning] Email transport credentials (EMAIL_USER/EMAIL_APP_PASSWORD) or recipient (ADMIN_NOTIFICATION_EMAIL) not set in environment. Backup JSON buffer generated successfully.');
+      console.warn('[Backup Email Warning] Email transport credentials (EMAIL_USER/EMAIL_APP_PASSWORD) or recipient (ADMIN_NOTIFICATION_EMAIL) not set in environment. Backup buffer generated successfully.');
       return {
         success: false,
         skipped: true,
@@ -51,6 +54,12 @@ const sendBackupEmail = async (jsonBuffer, exportDateISO, counts = {}) => {
     });
     const dateFileStr = new Date(exportDateISO).toISOString().split('T')[0];
 
+    const isExcel = fileType === 'xlsx';
+    const filename = isExcel ? `satkar-backup-${dateFileStr}.xlsx` : `satkar-backup-${dateFileStr}.json`;
+    const contentType = isExcel
+      ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      : 'application/json';
+
     const mailOptions = {
       from: `"Satkar Medical System" <${user}>`,
       to: recipient,
@@ -58,12 +67,12 @@ const sendBackupEmail = async (jsonBuffer, exportDateISO, counts = {}) => {
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
           <h2 style="color: #0B4C52; margin-top: 0;">Satkar Medical Pharmacy System</h2>
-          <h3 style="color: #17878E;">Automated Quarterly Database Backup</h3>
+          <h3 style="color: #17878E;">Automated Quarterly Data Backup</h3>
           <p>Hello Admin,</p>
-          <p>Please find attached the automated database backup JSON export for Satkar Medical PMS generated on <strong>${dateFormatted}</strong>.</p>
+          <p>Please find attached the automated database export Excel workbook for Satkar Medical PMS generated on <strong>${dateFormatted}</strong>.</p>
           
           <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; border-left: 4px solid #0B4C52; margin: 20px 0;">
-            <h4 style="margin-top: 0; color: #334155;">Collection Export Summary:</h4>
+            <h4 style="margin-top: 0; color: #334155;">Excel Workbook Summary (Sheets: Items, Batches, Bills, Returns, Suppliers, Invoices, Settings):</h4>
             <ul style="margin: 0; padding-left: 20px; color: #475569; font-family: monospace; line-height: 1.6;">
               <li>Medicines/Items: <strong>${counts.items || 0}</strong></li>
               <li>Stock Batches: <strong>${counts.batches || 0}</strong></li>
@@ -84,15 +93,15 @@ const sendBackupEmail = async (jsonBuffer, exportDateISO, counts = {}) => {
       `,
       attachments: [
         {
-          filename: `satkar-backup-${dateFileStr}.json`,
-          content: jsonBuffer,
-          contentType: 'application/json',
+          filename,
+          content: fileBuffer,
+          contentType,
         },
       ],
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log(`[Backup Email Success] Email sent to ${recipient} (Message ID: ${info.messageId})`);
+    console.log(`[Backup Email Success] Excel backup email sent to ${recipient} (Message ID: ${info.messageId})`);
     return { success: true, messageId: info.messageId, recipient };
   } catch (error) {
     console.error('[Backup Email Error] Failed to send email:', error.message);
@@ -106,6 +115,7 @@ const sendBackupEmail = async (jsonBuffer, exportDateISO, counts = {}) => {
  */
 const sendExpiryDigestEmail = async ({ expiringSoon = [], expired = [] }) => {
   try {
+    dotenv.config();
     const totalExpiringSoon = expiringSoon.length;
     const totalExpired = expired.length;
 

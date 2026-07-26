@@ -76,7 +76,68 @@ export function Dashboard() {
         </div>
 
         {/* Real-Time Summary Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Today's Net Sales Card */}
+          <Card 
+            onClick={() => navigate('/billing')}
+            className="hover:border-emerald-400 transition-all cursor-pointer border-l-4 border-l-emerald-500 bg-emerald-50/20"
+          >
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-mono text-emerald-800 uppercase">Today's Net Sales</CardTitle>
+              <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                <Sparkles className="w-4 h-4" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold font-mono text-emerald-900">
+                ₹{loading ? '...' : (summary.todaySales || 0).toFixed(2)}
+              </div>
+              <p className="text-xs text-emerald-700 mt-1 flex items-center gap-1">
+                <span>{summary.todayCustomerReturnRefunds > 0 ? `Gross ₹${summary.todayGrossSales.toFixed(2)} - Returns ₹${summary.todayCustomerReturnRefunds.toFixed(2)}` : 'Net sales today'}</span>
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Customer Returns Card */}
+          <Card 
+            onClick={() => navigate('/returns-history?tab=customer')}
+            className="hover:border-blue-400 transition-all cursor-pointer border-l-4 border-l-blue-500 bg-blue-50/20"
+          >
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-mono text-blue-800 uppercase">Customer Returns</CardTitle>
+              <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                <Layers className="w-4 h-4" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold font-mono text-blue-900">
+                {loading ? '...' : summary.customerReturnsCount || 0}
+              </div>
+              <p className="text-xs text-blue-700 mt-1">
+                Total Refunded: <strong>₹{(summary.customerReturnsAmount || 0).toFixed(2)}</strong>
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Supplier Expired Returns Card */}
+          <Card 
+            onClick={() => navigate('/returns-history?tab=supplier')}
+            className="hover:border-amber-400 transition-all cursor-pointer border-l-4 border-l-amber-500 bg-amber-50/20"
+          >
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-mono text-amber-800 uppercase">Supplier Expired Returns</CardTitle>
+              <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                <Package className="w-4 h-4" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold font-mono text-amber-900">
+                {loading ? '...' : summary.expiredReturnsCount || 0}
+              </div>
+              <p className="text-xs text-amber-700 mt-1">Returned expired vouchers</p>
+            </CardContent>
+          </Card>
+
           {/* Total Items */}
           <Card 
             onClick={() => navigate('/stock')}

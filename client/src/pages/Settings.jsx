@@ -172,6 +172,58 @@ export function Settings() {
               </div>
             </Card>
 
+            {/* Email Notifications & Backups Test Card */}
+            <Card className="p-5 bg-white/90">
+              <h3 className="text-sm font-heading font-bold text-primary mb-3 flex items-center gap-2 border-b border-gray-100 pb-3">
+                <FileText className="w-4 h-4 text-secondary" />
+                <span>Automated Email Alerts & Backup</span>
+              </h3>
+
+              <p className="text-xs text-muted mb-4 leading-relaxed">
+                Test automated system emails on demand. Notifications are sent to your configured admin email address.
+              </p>
+
+              <div className="space-y-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      const api = (await import('@/services/api')).default;
+                      const res = await api.post('/admin/trigger-expiry-email');
+                      alert(res.data?.message || 'Expiry alert email triggered successfully!');
+                    } catch (err) {
+                      alert(err.response?.data?.error?.message || err.response?.data?.message || 'Failed to trigger expiry digest email.');
+                    }
+                  }}
+                  className="w-full justify-start text-xs font-medium gap-2 border-amber-200 text-amber-900 hover:bg-amber-50"
+                >
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Send Test Expiry Digest Email</span>
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      const api = (await import('@/services/api')).default;
+                      const res = await api.post('/admin/trigger-backup');
+                      alert(res.data?.message || 'Quarterly backup email triggered successfully!');
+                    } catch (err) {
+                      alert(err.response?.data?.error?.message || err.response?.data?.message || 'Failed to trigger database backup email.');
+                    }
+                  }}
+                  className="w-full justify-start text-xs font-medium gap-2 border-teal-200 text-teal-900 hover:bg-teal-50"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
+                  <span>Send Test Data Backup Email</span>
+                </Button>
+              </div>
+            </Card>
+
             {/* Change Password Card */}
             <Card className="p-5 bg-white/90">
               <h3 className="text-sm font-heading font-bold text-primary mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">

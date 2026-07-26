@@ -43,6 +43,9 @@ export function InvoiceScan() {
   const [supplierName, setSupplierName] = useState('');
   const [invoiceNo, setInvoiceNo] = useState('');
   const [invoiceDate, setInvoiceDate] = useState('');
+  const [printedSubtotal, setPrintedSubtotal] = useState(null);
+  const [printedRoundOff, setPrintedRoundOff] = useState(null);
+  const [printedGrandTotal, setPrintedGrandTotal] = useState(null);
   const [storeType, setStoreType] = useState('medical');
   const [paymentStatus, setPaymentStatus] = useState('pending');
   const [items, setItems] = useState([]);
@@ -95,6 +98,9 @@ export function InvoiceScan() {
       setSupplierName(result.supplierName || 'Distributor Agency');
       setInvoiceNo(result.invoiceNo || `INV-${Date.now().toString().slice(-5)}`);
       setInvoiceDate(result.invoiceDate || new Date().toISOString().split('T')[0]);
+      setPrintedSubtotal(result.printedSubtotal ?? null);
+      setPrintedRoundOff(result.printedRoundOff ?? null);
+      setPrintedGrandTotal(result.printedGrandTotal ?? null);
       setRawOcrText(result.rawText || '');
 
       const parsedItems = result.items || [];
@@ -209,6 +215,9 @@ export function InvoiceScan() {
         supplierName,
         invoiceNo,
         invoiceDate,
+        printedSubtotal,
+        printedRoundOff,
+        printedGrandTotal,
         storeType,
         paymentStatus,
         items,
@@ -640,15 +649,26 @@ export function InvoiceScan() {
 
               {/* Summary Footer */}
               <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-100 bg-gray-50/50 p-4 rounded-xl">
-                <div className="text-xs text-muted font-mono flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span>Items: <strong className="text-primary font-bold">{items.length}</strong></span>
-                  <span className="hidden sm:inline text-gray-300">|</span>
-                  <span>Base: <strong className="text-gray-700">₹{baseCalculatedAmount.toFixed(2)}</strong></span>
-                  <span>+ CGST: <strong className="text-gray-700">₹{totalCgstAmount.toFixed(2)}</strong></span>
-                  <span>+ SGST: <strong className="text-gray-700">₹{totalSgstAmount.toFixed(2)}</strong></span>
-                  <span>= GST: <strong className="text-gray-900 font-bold">₹{totalGstAmount.toFixed(2)}</strong></span>
-                  <span className="hidden sm:inline text-gray-300">|</span>
-                  <span>Grand Total: <strong className="text-primary font-bold text-sm">₹{totalCalculatedAmount.toFixed(2)}</strong></span>
+                <div className="flex flex-col gap-1.5 text-xs font-mono">
+                  <div className="text-muted flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span>Items: <strong className="text-primary font-bold">{items.length}</strong></span>
+                    <span className="hidden sm:inline text-gray-300">|</span>
+                    <span>Base: <strong className="text-gray-700">₹{baseCalculatedAmount.toFixed(2)}</strong></span>
+                    <span>+ CGST: <strong className="text-gray-700">₹{totalCgstAmount.toFixed(2)}</strong></span>
+                    <span>+ SGST: <strong className="text-gray-700">₹{totalSgstAmount.toFixed(2)}</strong></span>
+                    <span>= GST: <strong className="text-gray-900 font-bold">₹{totalGstAmount.toFixed(2)}</strong></span>
+                    <span className="hidden sm:inline text-gray-300">|</span>
+                    <span>Calculated Total: <strong className="text-primary font-bold text-sm">₹{totalCalculatedAmount.toFixed(2)}</strong></span>
+                  </div>
+
+                  {(printedRoundOff !== null || printedGrandTotal !== null) && (
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-teal-800 bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200">
+                      <span className="font-semibold uppercase tracking-wider">Printed Invoice Header:</span>
+                      {printedSubtotal !== null && <span>Subtotal: ₹{printedSubtotal.toFixed(2)}</span>}
+                      {printedRoundOff !== null && <span>• Round Off: <strong className="font-bold">{printedRoundOff >= 0 ? `+₹${printedRoundOff.toFixed(2)}` : `-₹${Math.abs(printedRoundOff).toFixed(2)}`}</strong></span>}
+                      {printedGrandTotal !== null && <span>• Printed Net Total: <strong className="font-bold text-teal-900">₹{printedGrandTotal.toFixed(2)}</strong></span>}
+                    </div>
+                  )}
                 </div>
 
                 {/* Confirm Button */}

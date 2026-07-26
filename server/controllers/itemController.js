@@ -65,11 +65,16 @@ const createItem = async (req, res, next) => {
 // @access  Private
 const getItems = async (req, res, next) => {
   try {
-    const { storeType, search } = req.query;
+    const { storeType, search, category } = req.query;
     const filter = {};
 
     if (storeType) {
       filter.storeType = storeType;
+    }
+
+    if (category && category.trim() && category !== 'all') {
+      const escapedCategory = category.trim().replace(/[/\\^$*+?.()|[\]{}]/g, '\\$&');
+      filter.category = new RegExp(`^${escapedCategory}$`, 'i');
     }
 
     if (search && search.trim()) {

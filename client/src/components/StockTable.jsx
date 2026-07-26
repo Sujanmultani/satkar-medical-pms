@@ -32,6 +32,7 @@ export function StockTable({ storeType = 'medical' }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [expandedItemId, setExpandedItemId] = useState(null);
 
   // Modals state
@@ -55,7 +56,11 @@ export function StockTable({ storeType = 'medical' }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await getItems({ storeType, search });
+      const res = await getItems({
+        storeType,
+        search,
+        category: selectedCategory !== 'all' ? selectedCategory : undefined,
+      });
       setItems(res.data || []);
     } catch (err) {
       console.error('Error loading stock items:', err);
@@ -63,7 +68,7 @@ export function StockTable({ storeType = 'medical' }) {
     } finally {
       setLoading(false);
     }
-  }, [storeType, search]);
+  }, [storeType, search, selectedCategory]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -246,16 +251,47 @@ export function StockTable({ storeType = 'medical' }) {
         </Card>
       </div>
 
-      {/* Controls Bar: Search */}
+      {/* Controls Bar: Search & Category Filter */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white/80 backdrop-blur-sm p-3 rounded-xl border border-gray-200/80 shadow-sm">
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            placeholder={storeType === 'medical' ? 'Search by name, composition...' : 'Search items...'}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-white"
-          />
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder={storeType === 'medical' ? 'Search by name, composition...' : 'Search items...'}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 bg-white"
+            />
+          </div>
+
+          <div className="w-full sm:w-48">
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="h-9 w-full rounded-md border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+            >
+              <option value="all">All Categories</option>
+              {storeType === 'medical' ? (
+                <>
+                  <option value="Tablet">Tablet</option>
+                  <option value="Syrup">Syrup</option>
+                  <option value="Capsule">Capsule</option>
+                  <option value="Injection">Injection</option>
+                  <option value="Insulin">Insulin</option>
+                  <option value="Ointment">Ointment</option>
+                  <option value="Drops">Drops</option>
+                  <option value="Other">Other</option>
+                </>
+              ) : (
+                <>
+                  <option value="General">General</option>
+                  <option value="Grocery">Grocery</option>
+                  <option value="Personal Care">Personal Care</option>
+                  <option value="Other">Other</option>
+                </>
+              )}
+            </select>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 self-end sm:self-auto text-xs text-muted font-mono">

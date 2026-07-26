@@ -82,6 +82,9 @@ const scanInvoice = async (req, res, next) => {
       supplierName: parsedData.supplierName,
       invoiceNo: parsedData.invoiceNo,
       invoiceDate: parsedData.invoiceDate,
+      printedSubtotal: parsedData.printedSubtotal,
+      printedRoundOff: parsedData.printedRoundOff,
+      printedGrandTotal: parsedData.printedGrandTotal,
       items: parsedData.items,
     });
   } catch (error) {
@@ -100,7 +103,17 @@ const scanInvoice = async (req, res, next) => {
 // @access  Private
 const confirmInvoice = async (req, res, next) => {
   try {
-    const { supplierName, invoiceNo, invoiceDate, storeType = 'medical', paymentStatus = 'pending', items } = req.body;
+    const {
+      supplierName,
+      invoiceNo,
+      invoiceDate,
+      printedSubtotal,
+      printedRoundOff,
+      printedGrandTotal,
+      storeType = 'medical',
+      paymentStatus = 'pending',
+      items,
+    } = req.body;
     const isPaid = paymentStatus === 'paid';
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -211,6 +224,9 @@ const confirmInvoice = async (req, res, next) => {
       invoiceDate: invoiceDate ? new Date(invoiceDate) : new Date(),
       items: invoiceItemsPayload,
       totalAmount,
+      printedSubtotal: typeof printedSubtotal === 'number' ? printedSubtotal : null,
+      printedRoundOff: typeof printedRoundOff === 'number' ? printedRoundOff : null,
+      printedGrandTotal: typeof printedGrandTotal === 'number' ? printedGrandTotal : null,
       gstBreakdown: {
         cgst: totalCgst,
         sgst: totalSgst,

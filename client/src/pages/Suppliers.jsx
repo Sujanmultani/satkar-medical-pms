@@ -370,7 +370,7 @@ export function Suppliers() {
                                 {ret.creditNoteNo ? (
                                   <span className="font-bold text-primary">{ret.creditNoteNo}</span>
                                 ) : (
-                                  <span className="italic text-gray-400">Pending</span>
+                                  <span className="text-gray-400 font-mono" title="No credit note recorded for this return">—</span>
                                 )}
                               </TableCell>
                             </TableRow>

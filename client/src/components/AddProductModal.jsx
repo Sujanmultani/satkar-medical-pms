@@ -51,12 +51,51 @@ export function AddProductModal({ isOpen, onClose, onSuccess, storeType = 'medic
     }
   }, [isOpen, isMedical]);
 
+  const detectCategoryAndUnit = (productName) => {
+    if (!productName || !isMedical) return {};
+    const lower = productName.toLowerCase();
+
+    if (/\b(syrup|syp|suspension|susp|liquid|elixir|sol|solution)\b/i.test(lower)) {
+      return { category: 'Syrup', unit: 'bottle' };
+    }
+    if (/\b(tab|tablet|tablets|tabs)\b/i.test(lower)) {
+      return { category: 'Tablet', unit: 'strip' };
+    }
+    if (/\b(cap|capsule|capsules|caps)\b/i.test(lower)) {
+      return { category: 'Capsule', unit: 'strip' };
+    }
+    if (/\b(inj|injection|injections|vial|ampoule)\b/i.test(lower)) {
+      return { category: 'Injection', unit: 'vial' };
+    }
+    if (/\b(insulin|penfill|cartridge)\b/i.test(lower)) {
+      return { category: 'Insulin', unit: 'vial' };
+    }
+    if (/\b(oint|ointment|cream|gel|emulgel)\b/i.test(lower)) {
+      return { category: 'Ointment', unit: 'tube' };
+    }
+    if (/\b(drop|drops|eye drop|ear drop)\b/i.test(lower)) {
+      return { category: 'Drops', unit: 'bottle' };
+    }
+    return {};
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     const cleanValue = typeof value === 'string' && value.length > 1 && /^0\d/.test(value)
       ? value.replace(/^0+/, '')
       : value;
-    setFormData((prev) => ({ ...prev, [name]: cleanValue }));
+
+    let autoDetected = {};
+    if (name === 'name') {
+      autoDetected = detectCategoryAndUnit(cleanValue);
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: cleanValue,
+      ...autoDetected,
+    }));
+
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }));
     }
