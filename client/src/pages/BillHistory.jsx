@@ -39,10 +39,7 @@ export function BillHistory() {
   // Customer Return Modal State
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [billToReturn, setBillToReturn] = useState(null);
-  const [selectedLineIndex, setSelectedLineIndex] = useState(0);
-  const [returnQty, setReturnQty] = useState(1);
-  const [returnReason, setReturnReason] = useState('wrong_item');
-  const [restocked, setRestocked] = useState(true);
+  const [returnItemsMap, setReturnItemsMap] = useState({});
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [refundAmount, setRefundAmount] = useState(0);
@@ -80,61 +77,91 @@ export function BillHistory() {
     setBillToReturn(bill);
     setCustomerName(bill.customerName || '');
     setCustomerPhone(bill.customerPhone || '');
-    setReturnReason('wrong_item');
-    setRestocked(true);
     setNotes('');
 
     const items = bill.items || [];
-    const availableIdx = items.findIndex((i) => (i.maxReturnableQty ?? (i.qty - (i.returnedQty || 0))) > 0);
-    const targetIdx = availableIdx !== -1 ? availableIdx : 0;
+    const initialMap = {};
+    let firstAvailIdx = -1;
 
-    setSelectedLineIndex(targetIdx);
+    items.forEach((itemLine, idx) => {
+      const maxQty = itemLine.maxReturnableQty ?? (itemLine.qty - (itemLine.returnedQty || 0));
+      const isAvailable = maxQty > 0;
 
-    const targetItem = items[targetIdx];
-    if (targetItem) {
-      const maxQty = targetItem.maxReturnableQty ?? (targetItem.qty - (targetItem.returnedQty || 0));
-      const initialQty = Math.max(1, Math.min(1, maxQty));
-      setReturnQty(initialQty);
-      setRefundAmount(initialQty * Number(targetItem.mrp || 0));
-    } else {
-      setReturnQty(1);
-      setRefundAmount(0);
+      if (firstAvailIdx === -1 && isAvailable) {
+        firstAvailIdx = idx;
+      }
+
+      initialMap[idx] = {
+        selected: false,
+        returnQty: isAvailable ? 1 : 0,
+        reason: 'wrong_item',
+        restocked: true,
+      };
+    });
+
+    if (firstAvailIdx !== -1) {
+      initialMap[firstAvailIdx].selected = true;
     }
+
+    setReturnItemsMap(initialMap);
+
+    let sum = 0;
+    items.forEach((itemLine, idx) => {
+      if (initialMap[idx]?.selected) {
+        sum += (initialMap[idx].returnQty || 1) * Number(itemLine.mrp || itemLine.rate || 0);
+      }
+    });
+    setRefundAmount(Math.round(sum * 100) / 100);
 
     setIsReturnModalOpen(true);
   };
 
-  const handleLineItemChange = (indexStr) => {
-    const idx = Number(indexStr);
-    setSelectedLineIndex(idx);
-    const lineItem = (billToReturn?.items || [])[idx];
-    if (lineItem) {
-      const maxQty = lineItem.maxReturnableQty ?? (lineItem.qty - (lineItem.returnedQty || 0));
-      const initialQty = maxQty > 0 ? 1 : 0;
-      setReturnQty(initialQty);
-      setRefundAmount(initialQty * Number(lineItem.mrp || 0));
-    }
+  const recalculateRefund = (map, bill) => {
+    const b = bill || billToReturn;
+    let sum = 0;
+    (b?.items || []).forEach((itemLine, idx) => {
+      const st = map[idx];
+      if (st && st.selected) {
+        sum += (Number(st.returnQty) || 0) * Number(itemLine.mrp || itemLine.rate || 0);
+      }
+    });
+    setRefundAmount(Math.round(sum * 100) / 100);
   };
 
-  const handleQtyChange = (qtyVal) => {
-    const lineItem = (billToReturn?.items || [])[selectedLineIndex];
-    const maxQty = lineItem ? (lineItem.maxReturnableQty ?? (lineItem.qty - (lineItem.returnedQty || 0))) : 1;
-    let q = Number(qtyVal) || 1;
-    if (q > maxQty) q = maxQty;
-    if (q < 1 && maxQty > 0) q = 1;
-    setReturnQty(q);
-    if (lineItem) {
-      setRefundAmount(q * Number(lineItem.mrp || 0));
-    }
+  const handleToggleItemSelection = (idx) => {
+    setReturnItemsMap((prev) => {
+      const current = prev[idx] || {};
+      const nextItem = { ...current, selected: !current.selected };
+      const nextMap = { ...prev, [idx]: nextItem };
+      recalculateRefund(nextMap);
+      return nextMap;
+    });
   };
 
-  const handleReasonChange = (reasonVal) => {
-    setReturnReason(reasonVal);
-    if (['expired', 'damaged'].includes(reasonVal)) {
-      setRestocked(false);
-    } else {
-      setRestocked(true);
-    }
+  const handleItemReturnFieldChange = (idx, field, value) => {
+    setReturnItemsMap((prev) => {
+      const current = prev[idx] || {};
+      const itemLine = (billToReturn?.items || [])[idx];
+      const maxQty = itemLine ? (itemLine.maxReturnableQty ?? (itemLine.qty - (itemLine.returnedQty || 0))) : 1;
+
+      let updatedVal = value;
+      let updatedRestocked = current.restocked;
+
+      if (field === 'returnQty') {
+        let q = Number(value) || 1;
+        if (q > maxQty) q = maxQty;
+        if (q < 1 && maxQty > 0) q = 1;
+        updatedVal = q;
+      } else if (field === 'reason') {
+        const isDamagedOrExpired = ['expired', 'damaged'].includes(value);
+        updatedRestocked = !isDamagedOrExpired;
+      }
+
+      const nextItem = { ...current, [field]: updatedVal, restocked: updatedRestocked };
+      const nextMap = { ...prev, [idx]: nextItem };
+      recalculateRefund(nextMap);
+      return nextMap;
+    });
   };
 
   const handleConfirmCustomerReturn = async (e) => {
@@ -142,52 +169,66 @@ export function BillHistory() {
     if (!billToReturn) return;
 
     const lineItems = billToReturn.items || [];
-    const selectedLine = lineItems[selectedLineIndex];
-    if (!selectedLine) {
-      alert('Please select an item from the bill to return.');
+    const selectedIndices = Object.keys(returnItemsMap).filter((idx) => returnItemsMap[idx]?.selected);
+
+    if (selectedIndices.length === 0) {
+      alert('Please select at least one medicine item to return.');
       return;
     }
 
-    const maxAllowed = selectedLine.maxReturnableQty ?? (selectedLine.qty - (selectedLine.returnedQty || 0));
-    if (maxAllowed <= 0) {
-      alert('This medicine has already been fully returned.');
-      return;
-    }
+    for (const idxStr of selectedIndices) {
+      const idx = Number(idxStr);
+      const line = lineItems[idx];
+      const state = returnItemsMap[idx];
+      const maxAllowed = line.maxReturnableQty ?? (line.qty - (line.returnedQty || 0));
 
-    const numQty = Number(returnQty);
-    if (isNaN(numQty) || numQty < 1 || numQty > maxAllowed) {
-      alert(`Return quantity cannot exceed remaining un-returned quantity of ${maxAllowed}.`);
-      return;
+      if (maxAllowed <= 0) {
+        alert(`"${line.itemId?.name || 'Item'}" has already been fully returned.`);
+        return;
+      }
+      if (!state.returnQty || state.returnQty < 1 || state.returnQty > maxAllowed) {
+        alert(`Return quantity for "${line.itemId?.name || 'Item'}" must be between 1 and ${maxAllowed}.`);
+        return;
+      }
     }
 
     setIsSubmittingReturn(true);
     try {
-      const payload = {
-        type: 'customer',
-        referenceBillId: billToReturn._id,
-        itemId: selectedLine.itemId?._id || selectedLine.itemId,
-        batchId: selectedLine.batchId?._id || selectedLine.batchId,
-        storeType: selectedLine.itemId?.storeType || billToReturn.storeType || 'medical',
-        quantity: numQty,
-        reason: returnReason,
-        restocked,
-        customerName,
-        customerPhone,
-        refundAmount: Number(refundAmount) || 0,
-        returnDate: new Date().toISOString().split('T')[0],
-        notes,
-      };
+      let createdRecord = null;
 
-      const res = await createReturn(payload);
+      for (const idxStr of selectedIndices) {
+        const idx = Number(idxStr);
+        const selectedLine = lineItems[idx];
+        const state = returnItemsMap[idx];
+        const lineRefund = (Number(state.returnQty) || 0) * Number(selectedLine.mrp || selectedLine.rate || 0);
+
+        const payload = {
+          type: 'customer',
+          referenceBillId: billToReturn._id,
+          itemId: selectedLine.itemId?._id || selectedLine.itemId,
+          batchId: selectedLine.batchId?._id || selectedLine.batchId,
+          storeType: selectedLine.itemId?.storeType || billToReturn.storeType || 'medical',
+          quantity: Number(state.returnQty),
+          reason: state.reason || 'wrong_item',
+          restocked: Boolean(state.restocked),
+          customerName,
+          customerPhone,
+          refundAmount: Number(lineRefund) || 0,
+          returnDate: new Date().toISOString().split('T')[0],
+          notes: notes ? `${notes} (Bill ${billToReturn.billNo})` : `Customer Return (Bill ${billToReturn.billNo})`,
+        };
+
+        const res = await createReturn(payload);
+        if (res.data) createdRecord = res.data;
+      }
+
       setIsReturnModalOpen(false);
       setBillToReturn(null);
 
-      // Refresh list to instantly update badges and disabled button state
       fetchBillsList();
 
-      // Show printable return slip
-      if (res.data) {
-        setCreatedReturnRecord(res.data);
+      if (createdRecord) {
+        setCreatedReturnRecord(createdRecord);
         setIsPrintReturnModalOpen(true);
       }
     } catch (err) {
@@ -426,82 +467,129 @@ export function BillHistory() {
           bill={selectedBill}
         />
 
-        {/* Customer Return Dialog */}
+        {/* Customer Return Dialog (Supports Multi-Medicine Selection) */}
         <Dialog
           isOpen={isReturnModalOpen}
           onClose={() => setIsReturnModalOpen(false)}
           title={`Process Return for Bill ${billToReturn?.billNo}`}
-          description="Select item to return, adjust quantity, and record customer refund."
-          className="max-w-md"
+          description="Check one or multiple medicines to return, adjust quantities, and confirm refund."
+          className="max-w-2xl"
         >
           <form onSubmit={handleConfirmCustomerReturn} className="space-y-4 text-xs">
-            <div>
-              <Label htmlFor="itemSelect">Select Line Item to Return</Label>
-              <Select
-                id="itemSelect"
-                value={selectedLineIndex}
-                onChange={(e) => handleLineItemChange(e.target.value)}
-              >
+            {/* Medicines List */}
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-primary">Select Medicines to Return:</Label>
+              <div className="max-h-72 overflow-y-auto space-y-2.5 pr-1">
                 {(billToReturn?.items || []).map((itemLine, idx) => {
                   const maxQty = itemLine.maxReturnableQty ?? (itemLine.qty - (itemLine.returnedQty || 0));
                   const isLineFullyReturned = maxQty <= 0;
+                  const itemState = returnItemsMap[idx] || {};
+
                   return (
-                    <option key={idx} value={idx} disabled={isLineFullyReturned}>
-                      {itemLine.itemId?.name || 'Item'} (Batch: {itemLine.batchId?.batchNo || 'N/A'}) — Sold: {itemLine.qty}
-                      {itemLine.returnedQty > 0 ? ` | Returned: ${itemLine.returnedQty}` : ''}
-                      {isLineFullyReturned ? ' [FULLY RETURNED]' : ` | Max Returnable: ${maxQty}`} @ ₹{itemLine.mrp}
-                    </option>
+                    <div
+                      key={idx}
+                      className={`p-3 rounded-xl border transition-colors ${
+                        isLineFullyReturned
+                          ? 'bg-gray-100/70 border-gray-200 opacity-60'
+                          : itemState.selected
+                          ? 'bg-blue-50/60 border-blue-300 shadow-sm'
+                          : 'bg-white border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={itemState.selected || false}
+                          disabled={isLineFullyReturned}
+                          onChange={() => handleToggleItemSelection(idx)}
+                          className="w-4 h-4 mt-0.5 text-primary rounded cursor-pointer disabled:cursor-not-allowed"
+                        />
+
+                        <div className="flex-1 space-y-2 text-xs">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                            <div>
+                              <span className="font-bold text-primary text-sm">{itemLine.itemId?.name || 'Item'}</span>
+                              <span className="ml-2 font-mono text-[11px] text-gray-600 font-semibold">
+                                (Batch: {itemLine.batchId?.batchNo || 'N/A'})
+                              </span>
+                            </div>
+
+                            <div className="font-mono text-xs">
+                              {isLineFullyReturned ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-200 text-gray-600">
+                                  FULLY RETURNED
+                                </span>
+                              ) : (
+                                <span className="text-gray-700">
+                                  Sold: <strong className="text-primary">{itemLine.qty}</strong>
+                                  {itemLine.returnedQty > 0 && <span> | Returned: <strong>{itemLine.returnedQty}</strong></span>}
+                                  | Max Returnable: <strong className="text-emerald-700">{maxQty}</strong>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Options when checked */}
+                          {itemState.selected && !isLineFullyReturned && (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2.5 border-t border-blue-200/80">
+                              <div>
+                                <Label htmlFor={`qty-${idx}`} className="text-[11px] font-semibold text-gray-700">
+                                  Return Qty (Max {maxQty})
+                                </Label>
+                                <Input
+                                  id={`qty-${idx}`}
+                                  type="number"
+                                  min="1"
+                                  max={maxQty}
+                                  value={itemState.returnQty || 1}
+                                  onChange={(e) => handleItemReturnFieldChange(idx, 'returnQty', e.target.value)}
+                                  className="h-8 text-xs font-mono bg-white mt-1"
+                                  required
+                                />
+                              </div>
+
+                              <div>
+                                <Label htmlFor={`reason-${idx}`} className="text-[11px] font-semibold text-gray-700">
+                                  Return Reason
+                                </Label>
+                                <Select
+                                  id={`reason-${idx}`}
+                                  value={itemState.reason || 'wrong_item'}
+                                  onChange={(e) => handleItemReturnFieldChange(idx, 'reason', e.target.value)}
+                                  className="h-8 text-xs bg-white mt-1"
+                                >
+                                  <option value="wrong_item">Wrong Item Dispensed</option>
+                                  <option value="customer_dissatisfaction">Customer Return / Exchange</option>
+                                  <option value="expired">Expired Medicine</option>
+                                  <option value="damaged">Damaged / Broken Packaging</option>
+                                  <option value="other">Other Reason</option>
+                                </Select>
+                              </div>
+
+                              <div className="flex items-center gap-2 pt-5">
+                                <input
+                                  type="checkbox"
+                                  id={`restock-${idx}`}
+                                  checked={itemState.restocked ?? true}
+                                  onChange={(e) => handleItemReturnFieldChange(idx, 'restocked', e.target.checked)}
+                                  className="w-3.5 h-3.5 text-primary rounded cursor-pointer"
+                                />
+                                <Label htmlFor={`restock-${idx}`} className="cursor-pointer text-[11px] font-medium text-gray-800">
+                                  Restock (+Stock)
+                                </Label>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   );
                 })}
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="returnQty">Return Quantity</Label>
-                <Input
-                  id="returnQty"
-                  type="number"
-                  min="1"
-                  max={(billToReturn?.items || [])[selectedLineIndex]?.maxReturnableQty || 1}
-                  value={returnQty}
-                  onChange={(e) => handleQtyChange(e.target.value)}
-                  disabled={((billToReturn?.items || [])[selectedLineIndex]?.maxReturnableQty || 0) <= 0}
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="returnReason">Return Reason</Label>
-                <Select
-                  id="returnReason"
-                  value={returnReason}
-                  onChange={(e) => handleReasonChange(e.target.value)}
-                  required
-                >
-                  <option value="wrong_item">Wrong Item Dispensed</option>
-                  <option value="customer_dissatisfaction">Customer Return / Exchange</option>
-                  <option value="expired">Expired Medicine</option>
-                  <option value="damaged">Damaged / Broken Packaging</option>
-                  <option value="other">Other Reason</option>
-                </Select>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 p-2.5 bg-slate-50 border rounded-lg">
-              <input
-                type="checkbox"
-                id="restockedCheck"
-                checked={restocked}
-                onChange={(e) => setRestocked(e.target.checked)}
-                className="w-4 h-4 text-primary rounded"
-              />
-              <Label htmlFor="restockedCheck" className="cursor-pointer text-xs font-medium">
-                Restock item back to inventory (increments batch stock)
-              </Label>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
+            {/* Customer Meta & Refund Summary */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               <div>
                 <Label htmlFor="customerName">Customer Name</Label>
                 <Input
@@ -509,6 +597,7 @@ export function BillHistory() {
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="e.g. Ramesh Patel"
+                  className="mt-1"
                 />
               </div>
 
@@ -519,13 +608,14 @@ export function BillHistory() {
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
                   placeholder="e.g. 9876543210"
+                  className="mt-1"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="refundAmount">Refund Amount (₹)</Label>
+                <Label htmlFor="refundAmount">Total Refund Amount (₹)</Label>
                 <Input
                   id="refundAmount"
                   type="number"
@@ -534,6 +624,7 @@ export function BillHistory() {
                   value={refundAmount}
                   onChange={(e) => setRefundAmount(e.target.value)}
                   required
+                  className="mt-1 font-mono font-bold text-primary"
                 />
               </div>
 
@@ -544,16 +635,24 @@ export function BillHistory() {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Optional return notes"
+                  className="mt-1"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
               <Button type="button" variant="outline" size="sm" onClick={() => setIsReturnModalOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" variant="default" size="sm" disabled={isSubmittingReturn}>
-                {isSubmittingReturn ? 'Processing...' : 'Confirm Customer Return'}
+              <Button
+                type="submit"
+                variant="default"
+                size="sm"
+                disabled={isSubmittingReturn || Object.keys(returnItemsMap).filter(k => returnItemsMap[k]?.selected).length === 0}
+              >
+                {isSubmittingReturn
+                  ? 'Processing...'
+                  : `Confirm Customer Return (${Object.keys(returnItemsMap).filter(k => returnItemsMap[k]?.selected).length} Selected)`}
               </Button>
             </div>
           </form>
