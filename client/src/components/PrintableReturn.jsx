@@ -46,6 +46,8 @@ export function PrintableReturn({ isOpen, onClose, returnRecord, businessInfo })
     wrong_item: 'Wrong Item Dispensed',
     customer_dissatisfaction: 'Customer Return / Exchange',
     other: 'Other Reason',
+  };
+
   const unitRate = isSupplier ? (batch.purchaseRate || 0) : (batch.mrp || 0);
   const calculatedTotal = roundMoney((returnRecord.quantity || 0) * unitRate);
 
