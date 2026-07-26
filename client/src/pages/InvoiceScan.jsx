@@ -25,6 +25,7 @@ import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
 import { SupplierAutocomplete } from '@/components/SupplierAutocomplete';
 import { Badge } from '@/components/ui/Badge';
+import { roundMoney } from '@/utils/money';
 
 export function InvoiceScan() {
   const navigate = useNavigate();
