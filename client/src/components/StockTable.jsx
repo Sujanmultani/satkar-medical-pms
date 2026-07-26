@@ -12,7 +12,9 @@ import {
   RefreshCw,
   Calendar,
   Tag,
-  FlaskConical
+  FlaskConical,
+  BookOpen,
+  Bookmark
 } from 'lucide-react';
 import { getItems, createItem, updateItem, deleteItem } from '@/services/itemService';
 import { createBatch, updateBatch, deleteBatch } from '@/services/batchService';
@@ -33,7 +35,8 @@ export function StockTable({ storeType = 'medical' }) {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [stockFilter, setStockFilter] = useState('in_stock'); // 'in_stock' (default) | 'out_of_stock' | 'all'
+  const [stockFilter, setStockFilter] = useState('all'); // 'all' (default) | 'in_stock' | 'out_of_stock'
+  const [viewMode, setViewMode] = useState('live_stock'); // 'live_stock' (default) | 'master_catalog' (Permanent Master Directory)
   const [expandedItemId, setExpandedItemId] = useState(null);
 
   // Modals state
@@ -61,7 +64,7 @@ export function StockTable({ storeType = 'medical' }) {
         storeType,
         search,
         category: selectedCategory !== 'all' ? selectedCategory : undefined,
-        stockStatus: stockFilter,
+        stockStatus: viewMode === 'master_catalog' ? 'all' : stockFilter,
       });
       setItems(res.data || []);
     } catch (err) {
@@ -70,7 +73,7 @@ export function StockTable({ storeType = 'medical' }) {
     } finally {
       setLoading(false);
     }
-  }, [storeType, search, selectedCategory, stockFilter]);
+  }, [storeType, search, selectedCategory, stockFilter, viewMode]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -220,6 +223,48 @@ export function StockTable({ storeType = 'medical' }) {
         </button>
       </div>
 
+      {/* Navigation View Mode Tabs */}
+      <div className="flex items-center gap-3 border-b border-gray-200/80 pb-3">
+        <button
+          onClick={() => setViewMode('live_stock')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+            viewMode === 'live_stock'
+              ? 'bg-primary text-white shadow-md'
+              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+          }`}
+        >
+          <Package className="w-3.5 h-3.5" />
+          <span>Live Stock Inventory</span>
+        </button>
+
+        <button
+          onClick={() => setViewMode('master_catalog')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+            viewMode === 'master_catalog'
+              ? 'bg-secondary text-white shadow-md'
+              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+          }`}
+        >
+          <BookOpen className="w-3.5 h-3.5" />
+          <span>Permanent Master Directory</span>
+          <span className={`ml-1 px-1.5 py-0.5 rounded-md text-[10px] font-mono ${
+            viewMode === 'master_catalog' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
+          }`}>
+            {totalItems} Items
+          </span>
+        </button>
+      </div>
+
+      {viewMode === 'master_catalog' && (
+        <div className="p-3.5 bg-teal-50/80 border border-teal-200/90 rounded-xl text-xs text-teal-900 flex items-start gap-2.5 shadow-sm">
+          <Bookmark className="w-4 h-4 text-secondary shrink-0 mt-0.5" />
+          <div>
+            <span className="font-bold">Permanent Master Catalog Directory: </span>
+            <span>All registered {storeType === 'medical' ? 'pharmacy medicines' : 'provision items'} are permanently stored here as master records. Sales billing never deletes or decrements master items from this directory.</span>
+          </div>
+        </div>
+      )}
+
       {/* Metric Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="p-4 flex items-center justify-between border-l-4 border-l-primary">
@@ -295,17 +340,19 @@ export function StockTable({ storeType = 'medical' }) {
             </select>
           </div>
 
-          <div className="w-full sm:w-48">
-            <select
-              value={stockFilter}
-              onChange={(e) => setStockFilter(e.target.value)}
-              className="h-9 w-full rounded-md border border-teal-300 bg-teal-50/50 px-3 py-1 text-xs font-semibold text-teal-900 shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-            >
-              <option value="in_stock">📦 In Stock Only</option>
-              <option value="out_of_stock">⚠️ Out of Stock (0 Qty)</option>
-              <option value="all">📋 All Master Items</option>
-            </select>
-          </div>
+          {viewMode === 'live_stock' && (
+            <div className="w-full sm:w-48">
+              <select
+                value={stockFilter}
+                onChange={(e) => setStockFilter(e.target.value)}
+                className="h-9 w-full rounded-md border border-teal-300 bg-teal-50/50 px-3 py-1 text-xs font-semibold text-teal-900 shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+              >
+                <option value="in_stock">📦 In Stock Only</option>
+                <option value="out_of_stock">⚠️ Out of Stock (0 Qty)</option>
+                <option value="all">📋 All Master Items</option>
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2 self-end sm:self-auto text-xs text-muted font-mono">
@@ -441,7 +488,13 @@ export function StockTable({ storeType = 'medical' }) {
                     </TableCell>
 
                     <TableCell className="text-center font-mono font-bold text-sm">
-                      <span className={totalQty === 0 ? 'text-error' : 'text-text'}>{totalQty}</span>
+                      {totalQty > 0 ? (
+                        <span className="text-emerald-700 font-bold">{totalQty}</span>
+                      ) : (
+                        <span className="text-amber-800 text-[11px] font-mono px-2 py-0.5 rounded bg-amber-50 border border-amber-200" title="Master Item Entry Intact in System">
+                          0 (Master Entry Intact)
+                        </span>
+                      )}
                     </TableCell>
 
                     <TableCell className="font-mono text-xs text-gray-600">
@@ -451,19 +504,25 @@ export function StockTable({ storeType = 'medical' }) {
                           <span>{formatDate(nearestBatch.expiryDate)}</span>
                         </div>
                       ) : (
-                        <span className="italic text-gray-400">No batches</span>
+                        <span className="italic text-gray-400">No active batch</span>
                       )}
                     </TableCell>
 
                     <TableCell className="text-center">
-                      {batches.length === 0 ? (
-                        <Badge variant="outline">No Batches</Badge>
+                      {viewMode === 'master_catalog' ? (
+                        <Badge variant="outline" className="bg-teal-50 text-teal-800 border-teal-300">
+                          Master Catalog Record
+                        </Badge>
+                      ) : batches.length === 0 || totalQty === 0 ? (
+                        <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300">
+                          0 Stock (Master Saved)
+                        </Badge>
                       ) : worstStatus === 'expired' ? (
                         <Badge variant="expired">Expired</Badge>
                       ) : worstStatus === 'expiring_soon' ? (
                         <Badge variant="expiring_soon">Expiring Soon</Badge>
                       ) : (
-                        <Badge variant="active">Active</Badge>
+                        <Badge variant="active">Active Stock</Badge>
                       )}
                     </TableCell>
 
