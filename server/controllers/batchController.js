@@ -63,6 +63,7 @@ const createBatch = async (req, res, next) => {
       mfgDate: mfgDate ? new Date(mfgDate) : null,
       expiryDate: new Date(expiryDate),
       qty: numQty,
+      initialQty: numQty,
       purchaseRate: numPurchaseRate,
       mrp: numMrp,
       gstPercent: numGstPercent,
@@ -133,7 +134,13 @@ const updateBatch = async (req, res, next) => {
       batch.expiryDate = new Date(expiryDate);
       batch.status = computeBatchStatus(expiryDate);
     }
-    if (qty !== undefined) batch.qty = Math.max(0, Number(qty) || 0);
+    if (qty !== undefined) {
+      const newQtyVal = Math.max(0, Number(qty) || 0);
+      batch.qty = newQtyVal;
+      if (!batch.initialQty || batch.initialQty < newQtyVal) {
+        batch.initialQty = newQtyVal;
+      }
+    }
     if (purchaseRate !== undefined) batch.purchaseRate = Math.max(0, Number(purchaseRate) || 0);
     if (mrp !== undefined) batch.mrp = Math.max(0, Number(mrp) || 0);
     if (gstPercent !== undefined) batch.gstPercent = Math.max(0, Number(gstPercent) || 0);

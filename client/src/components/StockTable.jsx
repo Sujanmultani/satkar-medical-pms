@@ -161,6 +161,10 @@ export function StockTable({ storeType = 'medical' }) {
   const getItemSummary = (item) => {
     const batches = item.batches || [];
     const totalQty = batches.reduce((acc, b) => acc + (b.qty || 0), 0);
+    const masterTotalQty = batches.reduce(
+      (acc, b) => acc + (b.initialQty !== undefined && b.initialQty !== null && b.initialQty > 0 ? b.initialQty : (b.qty || 0)),
+      0
+    );
     
     // Find nearest expiry batch
     let nearestBatch = null;
@@ -177,7 +181,7 @@ export function StockTable({ storeType = 'medical' }) {
       }
     }
 
-    return { totalQty, nearestBatch, worstStatus };
+    return { totalQty, masterTotalQty, nearestBatch, worstStatus };
   };
 
   const formatDate = (dateString) => {
@@ -431,7 +435,9 @@ export function StockTable({ storeType = 'medical' }) {
               <TableHead>Item Name</TableHead>
               {storeType === 'medical' && <TableHead>Composition / Salt</TableHead>}
               <TableHead>Category / Unit</TableHead>
-              <TableHead className="text-center font-mono">Total Qty</TableHead>
+              <TableHead className="text-center font-mono">
+                {viewMode === 'master_catalog' ? 'Master Recorded Stock (Fixed)' : 'Total Available Qty'}
+              </TableHead>
               <TableHead className="font-mono">Nearest Expiry</TableHead>
               <TableHead className="text-center">Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -439,7 +445,7 @@ export function StockTable({ storeType = 'medical' }) {
           </TableHeader>
           <TableBody>
             {items.map((item) => {
-              const { totalQty, nearestBatch, worstStatus } = getItemSummary(item);
+              const { totalQty, masterTotalQty, nearestBatch, worstStatus } = getItemSummary(item);
               const isExpanded = expandedItemId === item._id;
               const batches = item.batches || [];
 
@@ -488,7 +494,11 @@ export function StockTable({ storeType = 'medical' }) {
                     </TableCell>
 
                     <TableCell className="text-center font-mono font-bold text-sm">
-                      {totalQty > 0 ? (
+                      {viewMode === 'master_catalog' ? (
+                        <span className="text-teal-900 font-bold bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-md text-xs inline-block" title="Fixed Master Record Quantity (Does not decrease on sales billing)">
+                          {masterTotalQty > 0 ? `${masterTotalQty} ${item.unit || 'units'} (Fixed Master)` : 'Master Catalog Record'}
+                        </span>
+                      ) : totalQty > 0 ? (
                         <span className="text-emerald-700 font-bold">{totalQty}</span>
                       ) : (
                         <span className="text-amber-800 text-[11px] font-mono px-2 py-0.5 rounded bg-amber-50 border border-amber-200" title="Master Item Entry Intact in System">

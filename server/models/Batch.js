@@ -31,6 +31,11 @@ const batchSchema = new mongoose.Schema(
       min: 0,
       default: 0,
     },
+    initialQty: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
     purchaseRate: {
       type: Number,
       min: 0,
