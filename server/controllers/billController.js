@@ -93,8 +93,8 @@ const createBill = async (req, res, next) => {
 
     // Step 3: Compute GST Breakdown & Totals using roundMoney at every step
     const cgst = roundMoney(totalGstAmount / 2);
-    const sgst = roundMoney(totalGstAmount / 2);
-    const totalAmount = roundMoney(subtotalAmount + cgst + sgst);
+    const sgst = roundMoney(totalGstAmount - cgst);
+    const totalAmount = roundMoney(subtotalAmount + totalGstAmount);
 
     const billNo = await generateBillNumber(billDate);
 

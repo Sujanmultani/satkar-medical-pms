@@ -201,8 +201,8 @@ const confirmInvoice = async (req, res, next) => {
     }
 
     const totalCgst = roundMoney(totalInvoiceGst / 2);
-    const totalSgst = roundMoney(totalInvoiceGst / 2);
-    const totalAmount = roundMoney(totalBaseAmount + totalCgst + totalSgst);
+    const totalSgst = roundMoney(totalInvoiceGst - totalCgst);
+    const totalAmount = roundMoney(totalBaseAmount + totalInvoiceGst);
 
     // Save Invoice Record
     const invoiceRecord = await Invoice.create({

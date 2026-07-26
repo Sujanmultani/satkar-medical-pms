@@ -165,8 +165,8 @@ export function Billing() {
     }, 0)
   );
   const cgst = roundMoney(totalGst / 2);
-  const sgst = roundMoney(totalGst / 2);
-  const grandTotal = roundMoney(subtotal + cgst + sgst);
+  const sgst = roundMoney(totalGst - cgst);
+  const grandTotal = roundMoney(subtotal + totalGst);
 
   // Generate Bill submit
   const handleGenerateBill = async () => {

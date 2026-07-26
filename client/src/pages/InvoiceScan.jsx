@@ -245,8 +245,8 @@ export function InvoiceScan() {
   );
 
   const totalCgstAmount = roundMoney(totalGstAmount / 2);
-  const totalSgstAmount = roundMoney(totalGstAmount / 2);
-  const totalCalculatedAmount = roundMoney(baseCalculatedAmount + totalCgstAmount + totalSgstAmount);
+  const totalSgstAmount = roundMoney(totalGstAmount - totalCgstAmount);
+  const totalCalculatedAmount = roundMoney(baseCalculatedAmount + totalGstAmount);
 
   return (
     <div className="relative min-h-screen p-6 md:p-8 bg-background">
