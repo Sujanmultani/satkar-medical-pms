@@ -6,20 +6,38 @@ const { roundMoney } = require('../utils/money');
 // Helper to generate unique readable bill number (INV-YYYYMMDD-XXXX)
 const generateBillNumber = async (dateObj) => {
   const d = dateObj ? new Date(dateObj) : new Date();
-  const dateStr = d.toISOString().split('T')[0].replace(/-/g, '');
+  const dateStr = isNaN(d.getTime())
+    ? new Date().toISOString().split('T')[0].replace(/-/g, '')
+    : d.toISOString().split('T')[0].replace(/-/g, '');
 
-  // Count bills created today for 4-digit sequence padding
-  const startOfDay = new Date(d);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(d);
-  endOfDay.setHours(23, 59, 59, 999);
+  const regex = new RegExp(`^INV-${dateStr}-`);
+  
+  // Find highest existing sequence bill for this date
+  const latestBill = await Bill.findOne({ billNo: regex })
+    .sort({ billNo: -1 })
+    .select('billNo')
+    .lean();
 
-  const countToday = await Bill.countDocuments({
-    createdAt: { $gte: startOfDay, $lte: endOfDay },
-  });
+  let nextSeq = 1;
+  if (latestBill && latestBill.billNo) {
+    const parts = latestBill.billNo.split('-');
+    const lastSeq = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(lastSeq)) {
+      nextSeq = lastSeq + 1;
+    }
+  }
 
-  const sequence = String(countToday + 1).padStart(4, '0');
-  return `INV-${dateStr}-${sequence}`;
+  // Safety retry loop to ensure absolute uniqueness
+  let candidateBillNo = `INV-${dateStr}-${String(nextSeq).padStart(4, '0')}`;
+  let exists = await Bill.exists({ billNo: candidateBillNo });
+
+  while (exists) {
+    nextSeq++;
+    candidateBillNo = `INV-${dateStr}-${String(nextSeq).padStart(4, '0')}`;
+    exists = await Bill.exists({ billNo: candidateBillNo });
+  }
+
+  return candidateBillNo;
 };
 
 // @desc    Create new sale bill & decrement batch stock
