@@ -7,10 +7,10 @@ const createTransporter = () => {
   const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.EMAIL_PORT, 10) || 587;
   const user = process.env.EMAIL_USER || process.env.GMAIL_USER;
-  const pass = process.env.EMAIL_PASS || process.env.GMAIL_APP_PASSWORD;
+  const pass = process.env.EMAIL_PASS || process.env.EMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASSWORD;
 
   if (!user || !pass) {
-    console.warn('[Email Service Warning] EMAIL_USER / EMAIL_PASS environment variables not configured.');
+    console.warn('[Email Service Warning] EMAIL_USER / EMAIL_APP_PASSWORD environment variables not configured.');
   }
 
   return nodemailer.createTransport({
@@ -30,11 +30,11 @@ const createTransporter = () => {
 const sendBackupEmail = async (jsonBuffer, exportDateISO, counts = {}) => {
   try {
     const user = process.env.EMAIL_USER || process.env.GMAIL_USER;
-    const pass = process.env.EMAIL_PASS || process.env.GMAIL_APP_PASSWORD;
+    const pass = process.env.EMAIL_PASS || process.env.EMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASSWORD;
     const recipient = process.env.ADMIN_NOTIFICATION_EMAIL || user;
 
     if (!user || !pass || !recipient) {
-      console.warn('[Backup Email Warning] Email transport credentials (EMAIL_USER/EMAIL_PASS) or recipient (ADMIN_NOTIFICATION_EMAIL) not set in environment. Backup JSON buffer generated successfully.');
+      console.warn('[Backup Email Warning] Email transport credentials (EMAIL_USER/EMAIL_APP_PASSWORD) or recipient (ADMIN_NOTIFICATION_EMAIL) not set in environment. Backup JSON buffer generated successfully.');
       return {
         success: false,
         skipped: true,
@@ -100,6 +100,146 @@ const sendBackupEmail = async (jsonBuffer, exportDateISO, counts = {}) => {
   }
 };
 
+/**
+ * Sends a daily HTML email digest alerting admin of expiring soon & expired inventory.
+ * @param {Object} data - { expiringSoon: Array, expired: Array }
+ */
+const sendExpiryDigestEmail = async ({ expiringSoon = [], expired = [] }) => {
+  try {
+    const totalExpiringSoon = expiringSoon.length;
+    const totalExpired = expired.length;
+
+    if (totalExpiringSoon === 0 && totalExpired === 0) {
+      console.log('[Expiry Email] No items expiring soon or expired today. Skipping email digest.');
+      return { success: true, skipped: true, message: 'No expiring or expired items to notify.' };
+    }
+
+    const user = process.env.EMAIL_USER || process.env.GMAIL_USER;
+    const pass = process.env.EMAIL_PASS || process.env.EMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASSWORD;
+    const recipient = process.env.ADMIN_NOTIFICATION_EMAIL || user;
+
+    if (!user || !pass || !recipient) {
+      console.warn('[Expiry Email Warning] Email transport credentials (EMAIL_USER/EMAIL_APP_PASSWORD) or recipient (ADMIN_NOTIFICATION_EMAIL) not set in environment.');
+      return {
+        success: false,
+        skipped: true,
+        message: 'Email credentials not configured in environment variables.',
+      };
+    }
+
+    const transporter = createTransporter();
+
+    // Build subject line with exact counts
+    const subjectParts = [];
+    if (totalExpiringSoon > 0) subjectParts.push(`${totalExpiringSoon} item${totalExpiringSoon > 1 ? 's' : ''} expiring soon`);
+    if (totalExpired > 0) subjectParts.push(`${totalExpired} expired`);
+    const subject = `Satkar Medical — ${subjectParts.join(', ')}`;
+
+    const renderTableRows = (items) => {
+      return items
+        .map((b) => {
+          const itemName = b.itemId?.name || 'Unknown Item';
+          const storeType = (b.itemId?.storeType || 'medical').toUpperCase();
+          const batchNo = b.batchNo || 'N/A';
+          const qty = b.qty || 0;
+          const expiryDateFormatted = b.expiryDate
+            ? new Date(b.expiryDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+            : 'N/A';
+
+          return `
+            <tr style="border-bottom: 1px solid #e2e8f0; text-align: left; font-size: 13px;">
+              <td style="padding: 8px 12px; font-weight: bold; color: #1e293b;">${itemName}</td>
+              <td style="padding: 8px 12px; font-family: monospace; color: #475569;">${batchNo}</td>
+              <td style="padding: 8px 12px; color: #0f172a;">${expiryDateFormatted}</td>
+              <td style="padding: 8px 12px; text-align: right; font-weight: bold; color: #0f172a;">${qty}</td>
+              <td style="padding: 8px 12px; text-align: center; font-size: 11px; color: #64748b;">${storeType}</td>
+            </tr>
+          `;
+        })
+        .join('');
+    };
+
+    const expiringTableHtml =
+      totalExpiringSoon > 0
+        ? `
+          <h3 style="color: #d97706; margin-top: 20px; font-size: 15px;">⚠️ Expiring Within 30 Days (${totalExpiringSoon})</h3>
+          <table style="width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
+            <thead>
+              <tr style="background: #fef3c7; color: #92400e; text-align: left; font-size: 12px;">
+                <th style="padding: 8px 12px;">Item Name</th>
+                <th style="padding: 8px 12px;">Batch No</th>
+                <th style="padding: 8px 12px;">Expiry Date</th>
+                <th style="padding: 8px 12px; text-align: right;">Qty</th>
+                <th style="padding: 8px 12px; text-align: center;">Store</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${renderTableRows(expiringSoon)}
+            </tbody>
+          </table>
+        `
+        : '';
+
+    const expiredTableHtml =
+      totalExpired > 0
+        ? `
+          <h3 style="color: #dc2626; margin-top: 25px; font-size: 15px;">🔴 Already Expired Stock (${totalExpired})</h3>
+          <table style="width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
+            <thead>
+              <tr style="background: #fee2e2; color: #991b1b; text-align: left; font-size: 12px;">
+                <th style="padding: 8px 12px;">Item Name</th>
+                <th style="padding: 8px 12px;">Batch No</th>
+                <th style="padding: 8px 12px;">Expiry Date</th>
+                <th style="padding: 8px 12px; text-align: right;">Qty</th>
+                <th style="padding: 8px 12px; text-align: center;">Store</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${renderTableRows(expired)}
+            </tbody>
+          </table>
+        `
+        : '';
+
+    const dateFormatted = new Date().toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
+        <h2 style="color: #0B4C52; margin-top: 0;">Satkar Medical Pharmacy System</h2>
+        <p style="color: #475569; font-size: 14px;">Daily Inventory Expiry Alert Digest for <strong>${dateFormatted}</strong></p>
+        
+        ${expiringTableHtml}
+        ${expiredTableHtml}
+
+        <p style="font-size: 12px; color: #64748b; margin-top: 25px; line-height: 1.5;">
+          * Action Required: Please review these stock batches. Expired batches should be processed for return to suppliers.
+        </p>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="font-size: 11px; color: #94a3b8; text-align: center;">Satkar Medical Pharmacy Management System • Automated Daily Digest</p>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: `"Satkar Medical Alerts" <${user}>`,
+      to: recipient,
+      subject,
+      html: htmlBody,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`[Expiry Digest Email Success] Alert digest sent to ${recipient} (Message ID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId, recipient, counts: { expiringSoon: totalExpiringSoon, expired: totalExpired } };
+  } catch (error) {
+    console.error('[Expiry Digest Email Error] Failed to send email:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendBackupEmail,
+  sendExpiryDigestEmail,
 };
