@@ -7,7 +7,7 @@ const { roundMoney } = require('../utils/money');
 const generateBillNumber = async (dateObj) => {
   const d = dateObj ? new Date(dateObj) : new Date();
   const dateStr = d.toISOString().split('T')[0].replace(/-/g, '');
-  
+
   // Count bills created today for 4-digit sequence padding
   const startOfDay = new Date(d);
   startOfDay.setHours(0, 0, 0, 0);

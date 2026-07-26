@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Receipt, 
-  Search, 
-  Plus, 
-  Trash2, 
-  Printer, 
-  AlertCircle, 
-  CheckCircle2, 
-  Calendar, 
-  User, 
-  Phone, 
+import {
+  Receipt,
+  Search,
+  Plus,
+  Trash2,
+  Printer,
+  AlertCircle,
+  CheckCircle2,
+  Calendar,
+  User,
+  Phone,
   CreditCard,
   Layers,
   Sparkles

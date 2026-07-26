@@ -1,17 +1,17 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ScanLine, 
-  UploadCloud, 
-  FileText, 
-  Plus, 
-  Trash2, 
-  AlertTriangle, 
-  CheckCircle2, 
-  RefreshCw, 
-  ArrowRight, 
-  Building2, 
-  Calendar, 
+import {
+  ScanLine,
+  UploadCloud,
+  FileText,
+  Plus,
+  Trash2,
+  AlertTriangle,
+  CheckCircle2,
+  RefreshCw,
+  ArrowRight,
+  Building2,
+  Calendar,
   Receipt,
   Sparkles,
   ShieldAlert
@@ -291,11 +291,10 @@ export function InvoiceScan() {
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
-              className={`p-10 md:p-14 text-center border-2 border-dashed cursor-pointer transition-all duration-200 bg-white/90 ${
-                isDragging
-                  ? 'border-secondary bg-secondary/10 shadow-lg scale-[1.01]'
-                  : 'border-secondary/40 hover:border-secondary hover:bg-teal-50/30 shadow-card'
-              }`}
+              className={`p-10 md:p-14 text-center border-2 border-dashed cursor-pointer transition-all duration-200 bg-white/90 ${isDragging
+                ? 'border-secondary bg-secondary/10 shadow-lg scale-[1.01]'
+                : 'border-secondary/40 hover:border-secondary hover:bg-teal-50/30 shadow-card'
+                }`}
             >
               <input
                 ref={fileInputRef}
@@ -486,9 +485,8 @@ export function InvoiceScan() {
                       return (
                         <tr
                           key={idx}
-                          className={`transition-colors hover:bg-gray-50/80 ${
-                            item.confidence === 'low' ? 'bg-amber-50/40 border-l-4 border-l-amber-400' : ''
-                          }`}
+                          className={`transition-colors hover:bg-gray-50/80 ${item.confidence === 'low' ? 'bg-amber-50/40 border-l-4 border-l-amber-400' : ''
+                            }`}
                         >
                           {/* Status/Confidence */}
                           <td className="py-2 px-2 text-center">
@@ -524,7 +522,7 @@ export function InvoiceScan() {
                                   className={`h-8 text-xs w-full min-w-[210px] ${item.compositionSource === 'auto-filled' ? 'pr-14 bg-teal-50/40' : ''}`}
                                 />
                                 {item.compositionSource === 'auto-filled' && (
-                                  <span 
+                                  <span
                                     title="Auto-filled from existing medicine history"
                                     className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[9px] font-mono text-teal-700 bg-teal-100/90 px-1 py-0.5 rounded border border-teal-300 pointer-events-none"
                                   >
