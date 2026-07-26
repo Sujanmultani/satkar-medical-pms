@@ -31,7 +31,8 @@ export function Dashboard() {
   useEffect(() => {
     async function loadSummary() {
       try {
-        const data = await getDashboardSummary();
+        const res = await getDashboardSummary();
+        const data = res?.data || res || {};
         setSummary(data);
       } catch (err) {
         console.error('Failed to load dashboard summary:', err);
