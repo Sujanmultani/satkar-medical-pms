@@ -6,6 +6,7 @@ import { markPrinted } from '@/services/billService';
 import { getSettings } from '@/services/settingsService';
 import logoAsset from '@/assets/satkar-logo.jpeg';
 import { Printer, MessageCircle } from 'lucide-react';
+import { roundMoney } from '@/utils/money';
 
 export function PrintableBill({ isOpen, onClose, bill, businessInfo }) {
   const [settings, setSettings] = useState(businessInfo || null);
@@ -103,7 +104,7 @@ export function PrintableBill({ isOpen, onClose, bill, businessInfo }) {
             const batchRef = item.batchId || {};
             const lineRate = Number(item.rate) || 0;
             const lineQty = Number(item.qty) || 0;
-            const lineTotal = lineQty * lineRate;
+            const lineTotal = roundMoney(lineQty * lineRate);
 
             return (
               <tr key={idx}>

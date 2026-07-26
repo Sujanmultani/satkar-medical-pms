@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { getSettings } from '@/services/settingsService';
 import logoAsset from '@/assets/satkar-logo.jpeg';
 import { Printer } from 'lucide-react';
+import { roundMoney } from '@/utils/money';
 
 export function PrintableReturn({ isOpen, onClose, returnRecord, businessInfo }) {
   const [settings, setSettings] = useState(businessInfo || null);
@@ -45,10 +46,8 @@ export function PrintableReturn({ isOpen, onClose, returnRecord, businessInfo })
     wrong_item: 'Wrong Item Dispensed',
     customer_dissatisfaction: 'Customer Return / Exchange',
     other: 'Other Reason',
-  };
-
   const unitRate = isSupplier ? (batch.purchaseRate || 0) : (batch.mrp || 0);
-  const calculatedTotal = (returnRecord.quantity || 0) * unitRate;
+  const calculatedTotal = roundMoney((returnRecord.quantity || 0) * unitRate);
 
   const renderPaperContent = () => (
     <div className="space-y-6">

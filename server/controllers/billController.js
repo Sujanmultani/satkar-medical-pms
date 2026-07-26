@@ -1,6 +1,7 @@
 const Bill = require('../models/Bill');
 const Batch = require('../models/Batch');
 const Item = require('../models/Item');
+const { roundMoney } = require('../utils/money');
 
 // Helper to generate unique readable bill number (INV-YYYYMMDD-XXXX)
 const generateBillNumber = async (dateObj) => {
@@ -75,11 +76,11 @@ const createBill = async (req, res, next) => {
         });
       }
 
-      const lineTotal = numQty * numRate;
-      const lineGst = (lineTotal * numGst) / 100;
+      const lineBase = roundMoney(numQty * numRate);
+      const lineGst = roundMoney((lineBase * numGst) / 100);
 
-      subtotalAmount += lineTotal;
-      totalGstAmount += lineGst;
+      subtotalAmount = roundMoney(subtotalAmount + lineBase);
+      totalGstAmount = roundMoney(totalGstAmount + lineGst);
 
       batchUpdates.push({ batch, numQty });
     }
@@ -90,10 +91,10 @@ const createBill = async (req, res, next) => {
       await batch.save();
     }
 
-    // Step 3: Compute GST Breakdown & Totals
-    const cgst = Math.round((totalGstAmount / 2) * 100) / 100;
-    const sgst = Math.round((totalGstAmount / 2) * 100) / 100;
-    const totalAmount = Math.round((subtotalAmount + totalGstAmount) * 100) / 100;
+    // Step 3: Compute GST Breakdown & Totals using roundMoney at every step
+    const cgst = roundMoney(totalGstAmount / 2);
+    const sgst = roundMoney(totalGstAmount / 2);
+    const totalAmount = roundMoney(subtotalAmount + cgst + sgst);
 
     const billNo = await generateBillNumber(billDate);
 

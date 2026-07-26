@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/Table';
 import { PrintableBill } from '@/components/PrintableBill';
+import { roundMoney } from '@/utils/money';
 
 export function Billing() {
   // Form State
@@ -152,12 +153,20 @@ export function Billing() {
     setLineItems(lineItems.filter((_, i) => i !== index));
   };
 
-  // Live Summary Calculations
-  const subtotal = lineItems.reduce((acc, l) => acc + l.qty * l.rate, 0);
-  const totalGst = lineItems.reduce((acc, l) => acc + (l.qty * l.rate * (l.gst || 0)) / 100, 0);
-  const cgst = totalGst / 2;
-  const sgst = totalGst / 2;
-  const grandTotal = subtotal + totalGst;
+  // Live Summary Calculations using roundMoney at every step
+  const subtotal = roundMoney(
+    lineItems.reduce((acc, l) => acc + roundMoney(Number(l.qty || 0) * Number(l.rate || 0)), 0)
+  );
+  const totalGst = roundMoney(
+    lineItems.reduce((acc, l) => {
+      const lineBase = roundMoney(Number(l.qty || 0) * Number(l.rate || 0));
+      const lineGst = roundMoney((lineBase * Number(l.gst || 0)) / 100);
+      return acc + lineGst;
+    }, 0)
+  );
+  const cgst = roundMoney(totalGst / 2);
+  const sgst = roundMoney(totalGst / 2);
+  const grandTotal = roundMoney(subtotal + cgst + sgst);
 
   // Generate Bill submit
   const handleGenerateBill = async () => {

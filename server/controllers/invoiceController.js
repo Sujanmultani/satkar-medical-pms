@@ -4,6 +4,7 @@ const Item = require('../models/Item');
 const Batch = require('../models/Batch');
 const Invoice = require('../models/Invoice');
 const { computeBatchStatus } = require('../utils/batchStatus');
+const { roundMoney } = require('../utils/money');
 
 // @desc    Scan invoice image using Gemini (Vertex AI Multimodal)
 // @route   POST /api/invoices/scan
@@ -170,8 +171,8 @@ const confirmInvoice = async (req, res, next) => {
 
       const batchExpiry = expiryDate ? new Date(expiryDate) : null;
       const batchStatus = batchExpiry ? computeBatchStatus(batchExpiry) : 'active';
-      const lineBase = numQty * numPurchaseRate;
-      const lineGst = lineBase * (numGstPercent / 100);
+      const lineBase = roundMoney(numQty * numPurchaseRate);
+      const lineGst = roundMoney((lineBase * numGstPercent) / 100);
 
       // Create Batch
       const batch = await Batch.create({
@@ -190,8 +191,8 @@ const confirmInvoice = async (req, res, next) => {
       });
 
       createdBatchesCount++;
-      totalBaseAmount += lineBase;
-      totalInvoiceGst += lineGst;
+      totalBaseAmount = roundMoney(totalBaseAmount + lineBase);
+      totalInvoiceGst = roundMoney(totalInvoiceGst + lineGst);
 
       invoiceItemsPayload.push({
         batchId: batch._id,
@@ -199,9 +200,9 @@ const confirmInvoice = async (req, res, next) => {
       });
     }
 
-    const totalInvoiceGrand = totalBaseAmount + totalInvoiceGst;
-    const totalCgst = Math.round((totalInvoiceGst / 2) * 100) / 100;
-    const totalSgst = Math.round((totalInvoiceGst / 2) * 100) / 100;
+    const totalCgst = roundMoney(totalInvoiceGst / 2);
+    const totalSgst = roundMoney(totalInvoiceGst / 2);
+    const totalAmount = roundMoney(totalBaseAmount + totalCgst + totalSgst);
 
     // Save Invoice Record
     const invoiceRecord = await Invoice.create({
@@ -209,11 +210,11 @@ const confirmInvoice = async (req, res, next) => {
       invoiceNo: invoiceNo ? invoiceNo.trim() : `INV-${Date.now().toString().slice(-6)}`,
       invoiceDate: invoiceDate ? new Date(invoiceDate) : new Date(),
       items: invoiceItemsPayload,
-      totalAmount: Math.round(totalInvoiceGrand * 100) / 100,
+      totalAmount,
       gstBreakdown: {
         cgst: totalCgst,
         sgst: totalSgst,
-        totalGst: Math.round(totalInvoiceGst * 100) / 100,
+        totalGst: totalInvoiceGst,
       },
       status: 'confirmed',
     });

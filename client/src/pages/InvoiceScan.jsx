@@ -224,22 +224,28 @@ export function InvoiceScan() {
   };
 
   // Calculate totals (Base Amount + CGST + SGST = Total Calculated Amount)
-  const baseCalculatedAmount = items.reduce((sum, item) => {
-    const qty = Number(item.qty) || 0;
-    const rate = Number(item.purchaseRate) || 0;
-    return sum + (qty * rate);
-  }, 0);
+  const baseCalculatedAmount = roundMoney(
+    items.reduce((sum, item) => {
+      const qty = Number(item.qty) || 0;
+      const rate = Number(item.purchaseRate) || 0;
+      return sum + roundMoney(qty * rate);
+    }, 0)
+  );
 
-  const totalGstAmount = items.reduce((sum, item) => {
-    const qty = Number(item.qty) || 0;
-    const rate = Number(item.purchaseRate) || 0;
-    const gstPercent = Number(item.gstPercent) || 0;
-    return sum + (qty * rate * (gstPercent / 100));
-  }, 0);
+  const totalGstAmount = roundMoney(
+    items.reduce((sum, item) => {
+      const qty = Number(item.qty) || 0;
+      const rate = Number(item.purchaseRate) || 0;
+      const gstPercent = Number(item.gstPercent) || 0;
+      const lineBase = roundMoney(qty * rate);
+      const lineGst = roundMoney((lineBase * gstPercent) / 100);
+      return sum + lineGst;
+    }, 0)
+  );
 
-  const totalCgstAmount = totalGstAmount / 2;
-  const totalSgstAmount = totalGstAmount / 2;
-  const totalCalculatedAmount = baseCalculatedAmount + totalGstAmount;
+  const totalCgstAmount = roundMoney(totalGstAmount / 2);
+  const totalSgstAmount = roundMoney(totalGstAmount / 2);
+  const totalCalculatedAmount = roundMoney(baseCalculatedAmount + totalCgstAmount + totalSgstAmount);
 
   return (
     <div className="relative min-h-screen p-6 md:p-8 bg-background">
@@ -470,10 +476,11 @@ export function InvoiceScan() {
                     {items.map((item, idx) => {
                       const lineQty = Number(item.qty) || 0;
                       const lineRate = Number(item.purchaseRate) || 0;
-                      const lineGst = Number(item.gstPercent) || 0;
-                      const lineBase = lineQty * lineRate;
-                      const lineTotal = lineBase * (1 + lineGst / 100);
-                      const halfGst = (lineGst / 2).toFixed(1);
+                      const lineGstPercent = Number(item.gstPercent) || 0;
+                      const lineBase = roundMoney(lineQty * lineRate);
+                      const lineGst = roundMoney((lineBase * lineGstPercent) / 100);
+                      const lineTotal = roundMoney(lineBase + lineGst);
+                      const halfGst = (lineGstPercent / 2).toFixed(1);
 
                       return (
                         <tr
