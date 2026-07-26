@@ -109,7 +109,12 @@ export function PrintableBill({ isOpen, onClose, bill, businessInfo }) {
             return (
               <tr key={idx}>
                 <td className="py-2 px-2 font-sans font-medium text-gray-900">
-                  {itemRef.name || 'Medicine / Item'}
+                  <span>{itemRef.name || 'Medicine / Item'}</span>
+                  {item.returnedQty > 0 && (
+                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                      Returned ({item.returnedQty})
+                    </span>
+                  )}
                   {itemRef.composition && (
                     <span className="block text-[10px] text-muted font-normal">{itemRef.composition}</span>
                   )}

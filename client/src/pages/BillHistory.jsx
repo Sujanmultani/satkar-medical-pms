@@ -78,17 +78,24 @@ export function BillHistory() {
 
   const handleOpenReturnModal = (bill) => {
     setBillToReturn(bill);
-    setSelectedLineIndex(0);
     setCustomerName(bill.customerName || '');
     setCustomerPhone(bill.customerPhone || '');
     setReturnReason('wrong_item');
     setRestocked(true);
     setNotes('');
 
-    const firstItem = (bill.items || [])[0];
-    if (firstItem) {
-      setReturnQty(1);
-      setRefundAmount(Number(firstItem.mrp || 0));
+    const items = bill.items || [];
+    const availableIdx = items.findIndex((i) => (i.maxReturnableQty ?? (i.qty - (i.returnedQty || 0))) > 0);
+    const targetIdx = availableIdx !== -1 ? availableIdx : 0;
+
+    setSelectedLineIndex(targetIdx);
+
+    const targetItem = items[targetIdx];
+    if (targetItem) {
+      const maxQty = targetItem.maxReturnableQty ?? (targetItem.qty - (targetItem.returnedQty || 0));
+      const initialQty = Math.max(1, Math.min(1, maxQty));
+      setReturnQty(initialQty);
+      setRefundAmount(initialQty * Number(targetItem.mrp || 0));
     } else {
       setReturnQty(1);
       setRefundAmount(0);
@@ -102,15 +109,20 @@ export function BillHistory() {
     setSelectedLineIndex(idx);
     const lineItem = (billToReturn?.items || [])[idx];
     if (lineItem) {
-      setReturnQty(1);
-      setRefundAmount(Number(lineItem.mrp || 0));
+      const maxQty = lineItem.maxReturnableQty ?? (lineItem.qty - (lineItem.returnedQty || 0));
+      const initialQty = maxQty > 0 ? 1 : 0;
+      setReturnQty(initialQty);
+      setRefundAmount(initialQty * Number(lineItem.mrp || 0));
     }
   };
 
   const handleQtyChange = (qtyVal) => {
-    const q = Number(qtyVal) || 1;
-    setReturnQty(q);
     const lineItem = (billToReturn?.items || [])[selectedLineIndex];
+    const maxQty = lineItem ? (lineItem.maxReturnableQty ?? (lineItem.qty - (lineItem.returnedQty || 0))) : 1;
+    let q = Number(qtyVal) || 1;
+    if (q > maxQty) q = maxQty;
+    if (q < 1 && maxQty > 0) q = 1;
+    setReturnQty(q);
     if (lineItem) {
       setRefundAmount(q * Number(lineItem.mrp || 0));
     }
@@ -136,9 +148,15 @@ export function BillHistory() {
       return;
     }
 
+    const maxAllowed = selectedLine.maxReturnableQty ?? (selectedLine.qty - (selectedLine.returnedQty || 0));
+    if (maxAllowed <= 0) {
+      alert('This medicine has already been fully returned.');
+      return;
+    }
+
     const numQty = Number(returnQty);
-    if (isNaN(numQty) || numQty < 1 || numQty > selectedLine.qty) {
-      alert(`Return quantity cannot exceed original sold quantity of ${selectedLine.qty}.`);
+    if (isNaN(numQty) || numQty < 1 || numQty > maxAllowed) {
+      alert(`Return quantity cannot exceed remaining un-returned quantity of ${maxAllowed}.`);
       return;
     }
 
@@ -163,6 +181,9 @@ export function BillHistory() {
       const res = await createReturn(payload);
       setIsReturnModalOpen(false);
       setBillToReturn(null);
+
+      // Refresh list to instantly update badges and disabled button state
+      fetchBillsList();
 
       // Show printable return slip
       if (res.data) {
@@ -331,7 +352,14 @@ export function BillHistory() {
                     </TableCell>
 
                     <TableCell className="text-right font-mono font-bold text-primary text-sm">
-                      ₹{(bill.totalAmount || 0).toFixed(2)}
+                      <div>
+                        <span>₹{(bill.totalAmount || 0).toFixed(2)}</span>
+                        {bill.isFullyReturned ? (
+                          <span className="block text-[10px] text-amber-800 font-semibold font-sans font-bold">(Fully Returned)</span>
+                        ) : bill.isPartiallyReturned ? (
+                          <span className="block text-[10px] text-amber-700 font-semibold font-sans">(Partial Return)</span>
+                        ) : null}
+                      </div>
                     </TableCell>
 
                     <TableCell className="text-center">
@@ -350,15 +378,28 @@ export function BillHistory() {
 
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenReturnModal(bill)}
-                          className="h-8 px-2.5 text-xs gap-1 border-blue-300 text-blue-800 hover:bg-blue-50"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>Process Return</span>
-                        </Button>
+                        {bill.isFullyReturned ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={true}
+                            className="h-8 px-2.5 text-xs gap-1 border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed opacity-80"
+                            title="All items in this bill have been returned"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Returned</span>
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenReturnModal(bill)}
+                            className="h-8 px-2.5 text-xs gap-1 border-blue-300 text-blue-800 hover:bg-blue-50"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>{bill.isPartiallyReturned ? 'Return Remaining' : 'Process Return'}</span>
+                          </Button>
+                        )}
 
                         <Button
                           variant="ghost"
@@ -401,11 +442,17 @@ export function BillHistory() {
                 value={selectedLineIndex}
                 onChange={(e) => handleLineItemChange(e.target.value)}
               >
-                {(billToReturn?.items || []).map((itemLine, idx) => (
-                  <option key={idx} value={idx}>
-                    {itemLine.itemId?.name || 'Item'} (Batch: {itemLine.batchId?.batchNo || 'N/A'}) — Sold Qty: {itemLine.qty} @ ₹{itemLine.mrp}
-                  </option>
-                ))}
+                {(billToReturn?.items || []).map((itemLine, idx) => {
+                  const maxQty = itemLine.maxReturnableQty ?? (itemLine.qty - (itemLine.returnedQty || 0));
+                  const isLineFullyReturned = maxQty <= 0;
+                  return (
+                    <option key={idx} value={idx} disabled={isLineFullyReturned}>
+                      {itemLine.itemId?.name || 'Item'} (Batch: {itemLine.batchId?.batchNo || 'N/A'}) — Sold: {itemLine.qty}
+                      {itemLine.returnedQty > 0 ? ` | Returned: ${itemLine.returnedQty}` : ''}
+                      {isLineFullyReturned ? ' [FULLY RETURNED]' : ` | Max Returnable: ${maxQty}`} @ ₹{itemLine.mrp}
+                    </option>
+                  );
+                })}
               </Select>
             </div>
 
@@ -416,9 +463,10 @@ export function BillHistory() {
                   id="returnQty"
                   type="number"
                   min="1"
-                  max={(billToReturn?.items || [])[selectedLineIndex]?.qty || 1}
+                  max={(billToReturn?.items || [])[selectedLineIndex]?.maxReturnableQty || 1}
                   value={returnQty}
                   onChange={(e) => handleQtyChange(e.target.value)}
+                  disabled={((billToReturn?.items || [])[selectedLineIndex]?.maxReturnableQty || 0) <= 0}
                   required
                 />
               </div>

@@ -91,13 +91,25 @@ const createReturn = async (req, res, next) => {
         const bill = await Bill.findById(referenceBillId);
         if (bill) {
           const lineItem = bill.items.find((i) => i.batchId.toString() === batchId.toString());
-          if (lineItem && numQty > lineItem.qty) {
-            return res.status(400).json({
-              error: {
-                code: 'EXCEEDS_SOLD_QTY',
-                message: `Cannot return ${numQty} units. Original bill only had ${lineItem.qty} units of batch ${batch.batchNo}.`,
-              },
-            });
+          if (lineItem) {
+            const existingReturns = await Return.find({
+              type: 'customer',
+              referenceBillId: bill._id,
+              batchId,
+            }).lean();
+            const alreadyReturned = existingReturns.reduce((sum, r) => sum + (r.quantity || 0), 0);
+            const remainingAllowed = Math.max(0, lineItem.qty - alreadyReturned);
+
+            if (numQty > remainingAllowed) {
+              return res.status(400).json({
+                error: {
+                  code: 'EXCEEDS_SOLD_QTY',
+                  message: remainingAllowed > 0
+                    ? `Cannot return ${numQty} units. Only ${remainingAllowed} un-returned units remain for batch ${batch.batchNo} on this bill.`
+                    : `This item (Batch ${batch.batchNo}) has already been fully returned.`,
+                },
+              });
+            }
           }
         }
       }

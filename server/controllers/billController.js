@@ -127,6 +127,73 @@ const createBill = async (req, res, next) => {
 };
 
 // @desc    Get bills (searchable & filterable by date range)
+const Return = require('../models/Return');
+
+// Helper to attach customer return metadata (returnedQty, isReturned, maxReturnableQty, isFullyReturned)
+const attachReturnInfoToBills = async (bills) => {
+  if (!bills || bills.length === 0) return [];
+
+  const billIds = bills.map((b) => b._id);
+  const returns = await Return.find({
+    type: 'customer',
+    referenceBillId: { $in: billIds },
+  }).lean();
+
+  const returnsByBillMap = {};
+  returns.forEach((r) => {
+    if (!r.referenceBillId) return;
+    const key = r.referenceBillId.toString();
+    if (!returnsByBillMap[key]) {
+      returnsByBillMap[key] = [];
+    }
+    returnsByBillMap[key].push(r);
+  });
+
+  return bills.map((b) => {
+    const billReturns = returnsByBillMap[b._id.toString()] || [];
+
+    let totalBillQty = 0;
+    let totalReturnedQty = 0;
+
+    const itemsWithReturnStatus = (b.items || []).map((lineItem) => {
+      const lineBatchId = lineItem.batchId?._id ? lineItem.batchId._id.toString() : lineItem.batchId?.toString();
+      const lineItemId = lineItem.itemId?._id ? lineItem.itemId._id.toString() : lineItem.itemId?.toString();
+
+      const lineReturns = billReturns.filter((r) => {
+        const rBatchId = r.batchId ? r.batchId.toString() : null;
+        const rItemId = r.itemId ? r.itemId.toString() : null;
+        return (lineBatchId && rBatchId === lineBatchId) || (lineItemId && rItemId === lineItemId);
+      });
+
+      const returnedQty = lineReturns.reduce((sum, r) => sum + (r.quantity || 0), 0);
+      const isReturned = (lineItem.qty || 0) > 0 && returnedQty >= lineItem.qty;
+
+      totalBillQty += lineItem.qty || 0;
+      totalReturnedQty += returnedQty;
+
+      return {
+        ...lineItem,
+        returnedQty,
+        isReturned,
+        maxReturnableQty: Math.max(0, (lineItem.qty || 0) - returnedQty),
+      };
+    });
+
+    const isFullyReturned = totalBillQty > 0 && totalReturnedQty >= totalBillQty;
+    const isPartiallyReturned = totalReturnedQty > 0 && !isFullyReturned;
+
+    return {
+      ...b,
+      items: itemsWithReturnStatus,
+      returns: billReturns,
+      totalReturnedQty,
+      isFullyReturned,
+      isPartiallyReturned,
+    };
+  });
+};
+
+// @desc    Get bills (searchable & filterable by date range)
 // @route   GET /api/bills
 // @access  Private
 const getBills = async (req, res, next) => {
@@ -162,8 +229,10 @@ const getBills = async (req, res, next) => {
       .limit(limit)
       .lean();
 
+    const populatedBills = await attachReturnInfoToBills(bills);
+
     return res.status(200).json({
-      data: bills,
+      data: populatedBills,
       pagination: {
         page,
         limit,
@@ -192,7 +261,9 @@ const getBillById = async (req, res, next) => {
       });
     }
 
-    return res.status(200).json({ data: bill });
+    const [populatedBill] = await attachReturnInfoToBills([bill]);
+
+    return res.status(200).json({ data: populatedBill });
   } catch (error) {
     next(error);
   }
