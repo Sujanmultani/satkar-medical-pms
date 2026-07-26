@@ -1,4 +1,5 @@
 const cron = require('node-cron');
+const Item = require('../models/Item');
 const Batch = require('../models/Batch');
 const { computeBatchStatus } = require('../utils/batchStatus');
 const { sendExpiryDigestEmail } = require('../services/emailService');

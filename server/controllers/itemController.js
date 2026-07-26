@@ -65,7 +65,7 @@ const createItem = async (req, res, next) => {
 // @access  Private
 const getItems = async (req, res, next) => {
   try {
-    const { storeType, search, category } = req.query;
+    const { storeType, search, category, stockStatus } = req.query;
     const filter = {};
 
     if (storeType) {
@@ -88,7 +88,19 @@ const getItems = async (req, res, next) => {
     }
 
     const items = await Item.find(filter).sort({ createdAt: -1 }).lean();
-    const populatedItems = await populateItemBatches(items);
+    let populatedItems = await populateItemBatches(items);
+
+    if (stockStatus === 'in_stock') {
+      populatedItems = populatedItems.filter((item) => {
+        const totalQty = (item.batches || []).reduce((sum, b) => sum + (b.qty || 0), 0);
+        return totalQty > 0;
+      });
+    } else if (stockStatus === 'out_of_stock') {
+      populatedItems = populatedItems.filter((item) => {
+        const totalQty = (item.batches || []).reduce((sum, b) => sum + (b.qty || 0), 0);
+        return totalQty === 0;
+      });
+    }
 
     return res.status(200).json({ data: populatedItems });
   } catch (error) {

@@ -33,6 +33,7 @@ export function StockTable({ storeType = 'medical' }) {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [stockFilter, setStockFilter] = useState('in_stock'); // 'in_stock' (default) | 'out_of_stock' | 'all'
   const [expandedItemId, setExpandedItemId] = useState(null);
 
   // Modals state
@@ -60,6 +61,7 @@ export function StockTable({ storeType = 'medical' }) {
         storeType,
         search,
         category: selectedCategory !== 'all' ? selectedCategory : undefined,
+        stockStatus: stockFilter,
       });
       setItems(res.data || []);
     } catch (err) {
@@ -68,7 +70,7 @@ export function StockTable({ storeType = 'medical' }) {
     } finally {
       setLoading(false);
     }
-  }, [storeType, search, selectedCategory]);
+  }, [storeType, search, selectedCategory, stockFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -290,6 +292,18 @@ export function StockTable({ storeType = 'medical' }) {
                   <option value="Other">Other</option>
                 </>
               )}
+            </select>
+          </div>
+
+          <div className="w-full sm:w-48">
+            <select
+              value={stockFilter}
+              onChange={(e) => setStockFilter(e.target.value)}
+              className="h-9 w-full rounded-md border border-teal-300 bg-teal-50/50 px-3 py-1 text-xs font-semibold text-teal-900 shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+            >
+              <option value="in_stock">📦 In Stock Only</option>
+              <option value="out_of_stock">⚠️ Out of Stock (0 Qty)</option>
+              <option value="all">📋 All Master Items</option>
             </select>
           </div>
         </div>
