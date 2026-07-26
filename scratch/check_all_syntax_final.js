@@ -10,7 +10,7 @@ const filesToCheck = [
   'server/controllers/invoiceController.js',
   'server/services/invoiceParser.js',
   'server/controllers/billController.js',
-  'server/controllers/returnController.js',
+  'server/controllers/batchController.js',
   'server/models/Invoice.js'
 ];
 

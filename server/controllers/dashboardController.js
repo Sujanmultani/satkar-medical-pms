@@ -2,7 +2,7 @@ const Item = require('../models/Item');
 const Batch = require('../models/Batch');
 const Bill = require('../models/Bill');
 const Return = require('../models/Return');
-const { roundMoney } = require('../utils/money');
+const { computeBatchStatus } = require('../utils/batchStatus');
 
 // @desc    Get dashboard summary statistics
 // @route   GET /api/dashboard/summary
@@ -11,7 +11,7 @@ const getDashboardSummary = async (req, res, next) => {
   try {
     const totalItems = await Item.countDocuments();
     
-    const batches = await Batch.find({}).select('qty status').lean();
+    const batches = await Batch.find({}).select('qty status expiryDate').lean();
     
     let totalBatchQty = 0;
     let expiringSoonCount = 0;
@@ -21,8 +21,9 @@ const getDashboardSummary = async (req, res, next) => {
       totalBatchQty += b.qty || 0;
       // Exclude qty <= 0 batches from expiring_soon and expired counts (matching Expiry Alerts)
       if ((b.qty || 0) > 0) {
-        if (b.status === 'expiring_soon') expiringSoonCount++;
-        if (b.status === 'expired') expiredCount++;
+        const liveStatus = computeBatchStatus(b.expiryDate);
+        if (liveStatus === 'expiring_soon') expiringSoonCount++;
+        if (liveStatus === 'expired') expiredCount++;
       }
     });
 

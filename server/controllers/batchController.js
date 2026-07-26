@@ -205,9 +205,14 @@ const deleteBatch = async (req, res, next) => {
   }
 };
 
+const { updateBatchExpiryStatuses } = require('../jobs/expiryStatusJob');
+
 // Helper for status-filtered batch queries (expiring_soon / expired)
 const getBatchesByStatus = async (req, res, next, targetStatus) => {
   try {
+    // Auto-sync batch statuses in DB before querying so expired/expiring batches are 100% accurate
+    await updateBatchExpiryStatuses(false);
+
     const { storeType } = req.query;
     const page = parseInt(req.query.page, 10) || 1;
     const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
@@ -230,8 +235,13 @@ const getBatchesByStatus = async (req, res, next, targetStatus) => {
       .limit(limit)
       .lean();
 
+    const batchesWithStatus = batches.map((b) => ({
+      ...b,
+      status: computeBatchStatus(b.expiryDate),
+    }));
+
     return res.status(200).json({
-      data: batches,
+      data: batchesWithStatus,
       pagination: {
         page,
         limit,
