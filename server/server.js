@@ -11,7 +11,9 @@ const billRoutes = require('./routes/billRoutes.js');
 const settingsRoutes = require('./routes/settingsRoutes.js');
 const returnRoutes = require('./routes/returnRoutes.js');
 const supplierRoutes = require('./routes/supplierRoutes.js');
+const adminRoutes = require('./routes/adminRoutes.js');
 const { startExpiryCron } = require('./jobs/expiryStatusJob.js');
+const { startQuarterlyBackupCron } = require('./jobs/quarterlyBackupJob.js');
 const { errorHandler, notFound } = require('./middleware/errorMiddleware.js');
 
 dotenv.config();
@@ -19,6 +21,7 @@ dotenv.config();
 // Connect to MongoDB & start background jobs
 connectDB().then(() => {
   startExpiryCron();
+  startQuarterlyBackupCron();
 });
 
 const app = express();
@@ -40,6 +43,7 @@ app.use('/api/bills', billRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/returns', returnRoutes);
 app.use('/api/suppliers', supplierRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
