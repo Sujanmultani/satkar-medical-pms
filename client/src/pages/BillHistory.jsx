@@ -194,7 +194,7 @@ export function BillHistory() {
 
     setIsSubmittingReturn(true);
     try {
-      let createdRecord = null;
+      const createdRecords = [];
 
       for (const idxStr of selectedIndices) {
         const idx = Number(idxStr);
@@ -219,7 +219,7 @@ export function BillHistory() {
         };
 
         const res = await createReturn(payload);
-        if (res.data) createdRecord = res.data;
+        if (res.data) createdRecords.push(res.data);
       }
 
       setIsReturnModalOpen(false);
@@ -227,8 +227,8 @@ export function BillHistory() {
 
       fetchBillsList();
 
-      if (createdRecord) {
-        setCreatedReturnRecord(createdRecord);
+      if (createdRecords.length > 0) {
+        setCreatedReturnRecord(createdRecords.length === 1 ? createdRecords[0] : createdRecords);
         setIsPrintReturnModalOpen(true);
       }
     } catch (err) {

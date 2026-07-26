@@ -35,10 +35,13 @@ export function PrintableReturn({ isOpen, onClose, returnRecord, businessInfo })
   const activeAddress = settings?.address || 'Main Road, Jambusar';
   const activePhone = settings?.phone || '';
 
-  const isSupplier = returnRecord.type === 'supplier';
-  const item = returnRecord.itemId || {};
-  const batch = returnRecord.batchId || {};
-  const refBill = returnRecord.referenceBillId || {};
+  const recordsArray = Array.isArray(returnRecord)
+    ? returnRecord
+    : (returnRecord?.records ? returnRecord.records : [returnRecord]);
+
+  const primaryRecord = recordsArray[0] || {};
+  const isSupplier = primaryRecord.type === 'supplier';
+  const refBill = primaryRecord.referenceBillId || {};
 
   const reasonLabels = {
     expired: 'Expired Stock',
@@ -48,8 +51,18 @@ export function PrintableReturn({ isOpen, onClose, returnRecord, businessInfo })
     other: 'Other Reason',
   };
 
-  const unitRate = isSupplier ? (batch.purchaseRate || 0) : (batch.mrp || 0);
-  const calculatedTotal = roundMoney((returnRecord.quantity || 0) * unitRate);
+  const totalRefundAmount = recordsArray.reduce((sum, r) => {
+    const b = r.batchId || {};
+    const rate = isSupplier ? (b.purchaseRate || 0) : (b.mrp || 0);
+    const lineVal = r.refundAmount !== undefined && r.refundAmount !== null && r.refundAmount > 0
+      ? r.refundAmount
+      : roundMoney((r.quantity || 0) * rate);
+    return sum + lineVal;
+  }, 0);
+
+  const displayReturnNo = recordsArray.length > 1
+    ? `${primaryRecord.returnNo} (+${recordsArray.length - 1} items)`
+    : primaryRecord.returnNo;
 
   const renderPaperContent = () => (
     <div className="space-y-6">
@@ -71,8 +84,8 @@ export function PrintableReturn({ isOpen, onClose, returnRecord, businessInfo })
           }`}>
             {isSupplier ? 'SUPPLIER RETURN SLIP' : 'CUSTOMER RETURN VOUCHER'}
           </span>
-          <p className="text-xs font-mono font-bold text-primary mt-2">{returnRecord.returnNo}</p>
-          <p className="text-[11px] text-muted font-mono">Date: {formatDate(returnRecord.returnDate)}</p>
+          <p className="text-xs font-mono font-bold text-primary mt-2">{displayReturnNo}</p>
+          <p className="text-[11px] text-muted font-mono">Date: {formatDate(primaryRecord.returnDate)}</p>
         </div>
       </div>
 
@@ -81,22 +94,22 @@ export function PrintableReturn({ isOpen, onClose, returnRecord, businessInfo })
         <div>
           {isSupplier ? (
             <>
-              <p><span className="font-semibold text-gray-600">Supplier:</span> {returnRecord.supplierName || 'N/A'}</p>
-              <p><span className="font-semibold text-gray-600">Credit Note No:</span> {returnRecord.creditNoteNo || 'No credit note recorded'}</p>
+              <p><span className="font-semibold text-gray-600">Supplier:</span> {primaryRecord.supplierName || 'N/A'}</p>
+              <p><span className="font-semibold text-gray-600">Credit Note No:</span> {primaryRecord.creditNoteNo || 'No credit note recorded'}</p>
             </>
           ) : (
             <>
-              <p><span className="font-semibold text-gray-600">Customer Name:</span> {returnRecord.customerName || 'Walk-in Customer'}</p>
-              {returnRecord.customerPhone && <p><span className="font-semibold text-gray-600">Phone:</span> {returnRecord.customerPhone}</p>}
+              <p><span className="font-semibold text-gray-600">Customer Name:</span> {primaryRecord.customerName || 'Walk-in Customer'}</p>
+              {primaryRecord.customerPhone && <p><span className="font-semibold text-gray-600">Phone:</span> {primaryRecord.customerPhone}</p>}
               {refBill.billNo && <p><span className="font-semibold text-gray-600">Reference Bill:</span> {refBill.billNo}</p>}
             </>
           )}
         </div>
         <div className="text-right space-y-1">
-          <p><span className="font-semibold text-gray-600">Reason:</span> <span className="font-medium text-primary">{reasonLabels[returnRecord.reason] || returnRecord.reason}</span></p>
-          <p><span className="font-semibold text-gray-600">Stock Restocked:</span> {returnRecord.restocked ? 'Yes (Returned to Inventory)' : 'No (Scrapped/Disposed)'}</p>
+          <p><span className="font-semibold text-gray-600">Reason:</span> <span className="font-medium text-primary">{reasonLabels[primaryRecord.reason] || primaryRecord.reason}</span></p>
+          <p><span className="font-semibold text-gray-600">Stock Restocked:</span> {primaryRecord.restocked ? 'Yes (Returned to Inventory)' : 'No (Scrapped/Disposed)'}</p>
           {!isSupplier && (
-            <p><span className="font-semibold text-gray-600">Refund Amount:</span> <span className="font-bold text-emerald-700">₹{(returnRecord.refundAmount || 0).toFixed(2)}</span></p>
+            <p><span className="font-semibold text-gray-600">Total Refund:</span> <span className="font-bold text-emerald-700 text-sm">₹{totalRefundAmount.toFixed(2)}</span></p>
           )}
         </div>
       </div>
@@ -111,30 +124,53 @@ export function PrintableReturn({ isOpen, onClose, returnRecord, businessInfo })
               <th className="p-2.5 text-center">Expiry</th>
               <th className="p-2.5 text-right">Qty</th>
               <th className="p-2.5 text-right">{isSupplier ? 'Purchase Rate' : 'MRP'}</th>
-              <th className="p-2.5 text-right">Total</th>
+              <th className="p-2.5 text-right">Total (₹)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 font-mono">
-            <tr>
-              <td className="p-2.5 font-sans font-medium text-gray-900">
-                {item.name || 'Unknown Item'}
-                {item.composition && <p className="text-[10px] text-muted font-normal">{item.composition}</p>}
-              </td>
-              <td className="p-2.5 font-bold">{batch.batchNo || 'N/A'}</td>
-              <td className="p-2.5 text-center">{formatDate(batch.expiryDate)}</td>
-              <td className="p-2.5 text-right font-bold">{returnRecord.quantity}</td>
-              <td className="p-2.5 text-right">₹{unitRate.toFixed(2)}</td>
-              <td className="p-2.5 text-right font-bold">₹{calculatedTotal.toFixed(2)}</td>
-            </tr>
+            {recordsArray.map((rec, idx) => {
+              const item = rec.itemId || {};
+              const batch = rec.batchId || {};
+              const unitRate = isSupplier ? (batch.purchaseRate || 0) : (batch.mrp || 0);
+              const lineTotal = rec.refundAmount !== undefined && rec.refundAmount !== null && rec.refundAmount > 0
+                ? rec.refundAmount
+                : roundMoney((rec.quantity || 0) * unitRate);
+
+              return (
+                <tr key={idx}>
+                  <td className="p-2.5 font-sans font-medium text-gray-900">
+                    {item.name || 'Unknown Item'}
+                    {item.composition && <p className="text-[10px] text-muted font-normal">{item.composition}</p>}
+                  </td>
+                  <td className="p-2.5 font-bold">{batch.batchNo || 'N/A'}</td>
+                  <td className="p-2.5 text-center">{formatDate(batch.expiryDate)}</td>
+                  <td className="p-2.5 text-right font-bold">{rec.quantity}</td>
+                  <td className="p-2.5 text-right">₹{unitRate.toFixed(2)}</td>
+                  <td className="p-2.5 text-right font-bold">₹{lineTotal.toFixed(2)}</td>
+                </tr>
+              );
+            })}
           </tbody>
+          {!isSupplier && recordsArray.length > 1 && (
+            <tfoot className="border-t-2 border-gray-300 font-mono bg-gray-50/80 font-bold">
+              <tr>
+                <td colSpan="5" className="p-2.5 text-right font-sans text-xs uppercase text-gray-700">
+                  Total Refund Amount:
+                </td>
+                <td className="p-2.5 text-right text-emerald-800 text-sm font-bold">
+                  ₹{totalRefundAmount.toFixed(2)}
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
 
       {/* Notes */}
-      {returnRecord.notes && (
+      {primaryRecord.notes && (
         <div className="p-2.5 bg-gray-50 border border-gray-200 rounded text-[11px]">
           <span className="font-semibold text-gray-700">Notes / Remarks: </span>
-          <span className="text-gray-600">{returnRecord.notes}</span>
+          <span className="text-gray-600">{primaryRecord.notes}</span>
         </div>
       )}
 

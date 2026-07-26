@@ -220,6 +220,20 @@ export function ReturnsHistory() {
     other: 'Other',
   };
 
+  const handlePrintReturn = (ret) => {
+    if (ret.type === 'customer' && ret.referenceBillId) {
+      const refId = ret.referenceBillId._id || ret.referenceBillId;
+      const relatedReturns = returnsList.filter(
+        (r) => r.type === 'customer' && (r.referenceBillId?._id || r.referenceBillId) === refId
+      );
+      if (relatedReturns.length > 1) {
+        setSelectedReturn(relatedReturns);
+        return;
+      }
+    }
+    setSelectedReturn(ret);
+  };
+
   return (
     <div className="relative min-h-screen p-6 md:p-8 bg-background">
       {/* Prominent Logo Watermark backdrop */}
@@ -231,10 +245,10 @@ export function ReturnsHistory() {
           <div>
             <h1 className="text-2xl font-heading font-bold text-primary flex items-center gap-2">
               <Undo2 className="w-6 h-6 text-secondary" />
-              <span>Returns Management History</span>
+              <span>Returns & Restock Audit History</span>
             </h1>
             <p className="text-xs text-muted mt-1">
-              Audit log of supplier returns and customer medicine returns with printable vouchers.
+              Track supplier returns, customer returns, and inventory restock status.
             </p>
           </div>
 
@@ -433,7 +447,7 @@ export function ReturnsHistory() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setSelectedReturn(ret)}
+                        onClick={() => handlePrintReturn(ret)}
                         className="h-8 px-2.5 text-xs gap-1 text-secondary hover:text-secondary-dark"
                       >
                         <Printer className="w-3.5 h-3.5" />
