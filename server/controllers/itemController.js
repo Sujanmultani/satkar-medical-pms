@@ -1,5 +1,6 @@
 const Item = require('../models/Item');
 const Batch = require('../models/Batch');
+const Bill = require('../models/Bill');
 const { computeBatchStatus } = require('../utils/batchStatus');
 
 // Reusable helper to attach populated batches with computed statuses to items
@@ -11,15 +12,31 @@ const populateItemBatches = async (items) => {
     .sort({ expiryDate: 1 })
     .lean();
   
+  // Sum sold quantities from bills per batch to backfill unpopulated initialQty
+  const batchIds = batches.map((b) => b._id);
+  const soldMap = {};
+  if (batchIds.length > 0) {
+    const bills = await Bill.find({ 'items.batchId': { $in: batchIds } }).select('items').lean();
+    bills.forEach((bill) => {
+      (bill.items || []).forEach((line) => {
+        if (line.batchId) {
+          const bIdStr = line.batchId.toString();
+          soldMap[bIdStr] = (soldMap[bIdStr] || 0) + (Number(line.qty) || 0);
+        }
+      });
+    });
+  }
+
   const batchesByItem = {};
   batches.forEach((b) => {
-    const initQty = b.initialQty !== undefined && b.initialQty !== null && b.initialQty > 0
+    const totalSold = soldMap[b._id.toString()] || 0;
+    const computedInitial = b.initialQty !== undefined && b.initialQty !== null && b.initialQty > 0
       ? b.initialQty
-      : (b.qty > 0 ? b.qty : 1);
+      : Math.max(1, (b.qty || 0) + totalSold);
 
     const batchWithStatus = {
       ...b,
-      initialQty: initQty,
+      initialQty: computedInitial,
       status: computeBatchStatus(b.expiryDate),
     };
     if (!batchesByItem[b.itemId.toString()]) {

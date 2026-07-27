@@ -195,6 +195,7 @@ const confirmInvoice = async (req, res, next) => {
         mfgDate: lineItem.mfgDate ? new Date(lineItem.mfgDate) : null,
         expiryDate: batchExpiry,
         qty: numQty,
+        initialQty: numQty,
         purchaseRate: numPurchaseRate,
         mrp: numMrp,
         gstPercent: numGstPercent,
