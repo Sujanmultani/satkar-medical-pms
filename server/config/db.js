@@ -1,38 +1,36 @@
 const mongoose = require('mongoose');
-const dns = require('dns');
-
-// Configure Node.js DNS resolution order for MongoDB Atlas SRV records
-try {
-  dns.setDefaultResultOrder('ipv4first');
-} catch (e) {
-  // Ignore if not supported in node version
-}
 
 const connectDB = async () => {
+  const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/satkar_medical';
+  const localUri = 'mongodb://127.0.0.1:27017/satkar_medical';
+
+  const options = {
+    serverSelectionTimeoutMS: 10000,
+    family: 4,
+  };
+
   try {
-    const conn = await mongoose.connect(
-      process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/satkar_medical',
-      {
-        serverSelectionTimeoutMS: 15000,
-        connectTimeoutMS: 15000,
-      }
-    );
+    const conn = await mongoose.connect(mongoUri, options);
     console.log(`[Satkar DB] MongoDB Connected: ${conn.connection.host}`);
+    return;
   } catch (error) {
-    console.error(`[Satkar DB Error] Initial connection failed: ${error.message}. Attempting DNS fallback...`);
-    try {
-      dns.setServers(['8.8.8.8', '1.1.1.1']);
-      const conn = await mongoose.connect(
-        process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/satkar_medical',
-        {
-          serverSelectionTimeoutMS: 15000,
-        }
-      );
-      console.log(`[Satkar DB] MongoDB Connected (DNS Fallback): ${conn.connection.host}`);
-    } catch (fallbackError) {
-      console.error(`[Satkar DB Error] Fallback connection failed: ${fallbackError.message}`);
-      process.exit(1);
+    console.error(`[Satkar DB Error] Primary DB connection failed: ${error.message}`);
+    
+    // Try fallback to local MongoDB if primary Atlas connection fails
+    if (mongoUri !== localUri) {
+      try {
+        console.log(`[Satkar DB] Trying fallback to local MongoDB (${localUri})...`);
+        const localConn = await mongoose.connect(localUri, options);
+        console.log(`[Satkar DB] Connected to local MongoDB: ${localConn.connection.host}`);
+        return;
+      } catch (localErr) {
+        console.error(`[Satkar DB Error] Local fallback also failed: ${localErr.message}`);
+      }
     }
+
+    // Keep backend server alive and retry in background
+    console.log('[Satkar DB] Server remaining active. Retrying database connection in 10 seconds...');
+    setTimeout(connectDB, 10000);
   }
 };
 
