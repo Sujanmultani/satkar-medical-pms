@@ -627,7 +627,14 @@ export function StockTable({ storeType = 'medical' }) {
                                     <th className="py-2 px-3">Supplier</th>
                                     <th className="py-2 px-3">Mfg Date</th>
                                     <th className="py-2 px-3">Expiry Date</th>
-                                    <th className="py-2 px-3 text-center">Stock Qty</th>
+                                    {viewMode === 'master_catalog' ? (
+                                      <>
+                                        <th className="py-2 px-3 text-center text-teal-900 font-bold bg-teal-50/80">Master Initial Qty (Fixed)</th>
+                                        <th className="py-2 px-3 text-center">Live Remaining Qty</th>
+                                      </>
+                                    ) : (
+                                      <th className="py-2 px-3 text-center">Available Stock Qty</th>
+                                    )}
                                     <th className="py-2 px-3 text-right">Purchase (₹)</th>
                                     <th className="py-2 px-3 text-right">MRP (₹)</th>
                                     <th className="py-2 px-3 text-center">GST %</th>
@@ -655,7 +662,16 @@ export function StockTable({ storeType = 'medical' }) {
                                       </td>
                                       <td className="py-2 px-3 text-gray-500">{formatDate(batch.mfgDate)}</td>
                                       <td className="py-2 px-3 font-medium text-gray-800">{formatDate(batch.expiryDate)}</td>
-                                      <td className="py-2 px-3 text-center font-bold">{batch.qty}</td>
+                                      {viewMode === 'master_catalog' ? (
+                                        <>
+                                          <td className="py-2 px-3 text-center font-bold text-teal-900 bg-teal-50/80" title="Fixed Master Initial Quantity (Does not decrease on billing)">
+                                            {batch.initialQty !== undefined && batch.initialQty !== null && batch.initialQty > 0 ? batch.initialQty : (batch.qty > 0 ? batch.qty : 1)}
+                                          </td>
+                                          <td className="py-2 px-3 text-center font-bold text-gray-700">{batch.qty}</td>
+                                        </>
+                                      ) : (
+                                        <td className="py-2 px-3 text-center font-bold text-emerald-800">{batch.qty}</td>
+                                      )}
                                       <td className="py-2 px-3 text-right text-gray-600">₹{(batch.purchaseRate || 0).toFixed(2)}</td>
                                       <td className="py-2 px-3 text-right font-medium text-gray-900">₹{(batch.mrp || 0).toFixed(2)}</td>
                                       <td className="py-2 px-3 text-center text-gray-500">{batch.gstPercent}%</td>

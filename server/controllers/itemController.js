@@ -13,7 +13,15 @@ const populateItemBatches = async (items) => {
   
   const batchesByItem = {};
   batches.forEach((b) => {
-    const batchWithStatus = { ...b, status: computeBatchStatus(b.expiryDate) };
+    const initQty = b.initialQty !== undefined && b.initialQty !== null && b.initialQty > 0
+      ? b.initialQty
+      : (b.qty > 0 ? b.qty : 1);
+
+    const batchWithStatus = {
+      ...b,
+      initialQty: initQty,
+      status: computeBatchStatus(b.expiryDate),
+    };
     if (!batchesByItem[b.itemId.toString()]) {
       batchesByItem[b.itemId.toString()] = [];
     }
