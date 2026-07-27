@@ -495,14 +495,10 @@ export function StockTable({ storeType = 'medical' }) {
 
                     <TableCell className="text-center font-mono font-bold text-sm">
                       {viewMode === 'master_catalog' ? (
-                        <span className="text-teal-900 font-bold bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-md text-xs inline-block" title="Fixed Master Record Quantity (Does not decrease on sales billing)">
-                          {masterTotalQty > 0 ? `${masterTotalQty} ${item.unit || 'units'} (Fixed Master)` : 'Master Catalog Record'}
-                        </span>
-                      ) : totalQty > 0 ? (
-                        <span className="text-emerald-700 font-bold">{totalQty}</span>
+                        <span className="text-teal-900 font-bold">{masterTotalQty}</span>
                       ) : (
-                        <span className="text-amber-800 text-[11px] font-mono px-2 py-0.5 rounded bg-amber-50 border border-amber-200" title="Master Item Entry Intact in System">
-                          0 (Master Entry Intact)
+                        <span className={totalQty === 0 ? 'text-amber-600 font-bold' : 'text-emerald-700 font-bold'}>
+                          {totalQty}
                         </span>
                       )}
                     </TableCell>
@@ -519,13 +515,9 @@ export function StockTable({ storeType = 'medical' }) {
                     </TableCell>
 
                     <TableCell className="text-center">
-                      {viewMode === 'master_catalog' ? (
-                        <Badge variant="outline" className="bg-teal-50 text-teal-800 border-teal-300">
-                          Master Catalog Record
-                        </Badge>
-                      ) : batches.length === 0 || totalQty === 0 ? (
-                        <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300">
-                          0 Stock (Master Saved)
+                      {batches.length === 0 || totalQty === 0 ? (
+                        <Badge variant="outline" className="text-amber-800 border-amber-300 bg-amber-50">
+                          Out of Stock
                         </Badge>
                       ) : worstStatus === 'expired' ? (
                         <Badge variant="expired">Expired</Badge>
@@ -626,14 +618,14 @@ export function StockTable({ storeType = 'medical' }) {
                                     <th className="py-2 px-3">Batch No</th>
                                     <th className="py-2 px-3">Supplier</th>
                                     <th className="py-2 px-3">Mfg Date</th>
-                                    <th className="py-2 px-3">Expiry Date</th>
+                                    <th className="py-2 px-3">Expiry</th>
                                     {viewMode === 'master_catalog' ? (
                                       <>
-                                        <th className="py-2 px-3 text-center text-teal-900 font-bold bg-teal-50/80">Master Initial Qty (Fixed)</th>
-                                        <th className="py-2 px-3 text-center">Live Remaining Qty</th>
+                                        <th className="py-2 px-3 text-center font-mono">Initial Qty</th>
+                                        <th className="py-2 px-3 text-center font-mono">Current Qty</th>
                                       </>
                                     ) : (
-                                      <th className="py-2 px-3 text-center">Available Stock Qty</th>
+                                      <th className="py-2 px-3 text-center font-mono">Stock Qty</th>
                                     )}
                                     <th className="py-2 px-3 text-right">Purchase (₹)</th>
                                     <th className="py-2 px-3 text-right">MRP (₹)</th>
@@ -664,13 +656,13 @@ export function StockTable({ storeType = 'medical' }) {
                                       <td className="py-2 px-3 font-medium text-gray-800">{formatDate(batch.expiryDate)}</td>
                                       {viewMode === 'master_catalog' ? (
                                         <>
-                                          <td className="py-2 px-3 text-center font-bold text-teal-900 bg-teal-50/80" title="Fixed Master Initial Quantity (Does not decrease on billing)">
+                                          <td className="py-2 px-3 text-center font-bold text-teal-900 font-mono">
                                             {batch.initialQty !== undefined && batch.initialQty !== null && batch.initialQty > 0 ? batch.initialQty : (batch.qty > 0 ? batch.qty : 1)}
                                           </td>
-                                          <td className="py-2 px-3 text-center font-bold text-gray-700">{batch.qty}</td>
+                                          <td className="py-2 px-3 text-center font-bold text-gray-700 font-mono">{batch.qty}</td>
                                         </>
                                       ) : (
-                                        <td className="py-2 px-3 text-center font-bold text-emerald-800">{batch.qty}</td>
+                                        <td className="py-2 px-3 text-center font-bold text-emerald-800 font-mono">{batch.qty}</td>
                                       )}
                                       <td className="py-2 px-3 text-right text-gray-600">₹{(batch.purchaseRate || 0).toFixed(2)}</td>
                                       <td className="py-2 px-3 text-right font-medium text-gray-900">₹{(batch.mrp || 0).toFixed(2)}</td>
