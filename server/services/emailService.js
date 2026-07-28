@@ -343,9 +343,8 @@ const sendPasswordResetOtpEmail = async ({ userEmail, userName, otp }) => {
       return { success: false, error: 'Email configuration missing' };
     }
 
-    const recipient = (userEmail && !userEmail.includes('@satkarmedical.com')) 
-      ? userEmail 
-      : (process.env.ADMIN_NOTIFICATION_EMAIL || 'satkarmedical8@gmail.com');
+    // Always send OTP strictly to admin notification email (satkarmedical8@gmail.com)
+    const recipient = process.env.ADMIN_NOTIFICATION_EMAIL || 'satkarmedical8@gmail.com';
 
     const htmlBody = `
       <div style="font-family: Arial, sans-serif; max-width: 550px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">

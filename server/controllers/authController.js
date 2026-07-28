@@ -195,10 +195,14 @@ const forgotPassword = async (req, res, next) => {
       });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    const cleanEmail = email.toLowerCase().trim();
+    const user = await User.findOne({
+      $or: [{ email: cleanEmail }, { role: 'admin' }],
+    });
+
     if (!user) {
-      return res.status(200).json({
-        message: 'If the email is registered, a 6-digit OTP code has been sent to your email address.',
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Admin user account not found.' },
       });
     }
 
@@ -210,16 +214,20 @@ const forgotPassword = async (req, res, next) => {
     user.resetOtpExpire = otpExpire;
     await user.save();
 
-    // Send OTP via Email
+    // Send OTP via Email strictly to satkarmedical8@gmail.com
     const { sendPasswordResetOtpEmail } = require('../services/emailService');
-    await sendPasswordResetOtpEmail({
+    const mailRes = await sendPasswordResetOtpEmail({
       userEmail: user.email,
       userName: user.name,
       otp,
-    }).catch((err) => console.error('[Forgot Password Email Error]', err.message));
+    });
+
+    if (!mailRes.success) {
+      console.warn('[Forgot Password Warning] Failed to dispatch OTP email:', mailRes.error);
+    }
 
     return res.status(200).json({
-      message: 'A 6-digit OTP code has been sent to your admin email address.',
+      message: 'A 6-digit OTP verification code has been sent strictly to satkarmedical8@gmail.com.',
     });
   } catch (error) {
     next(error);
@@ -245,7 +253,10 @@ const resetPasswordWithOtp = async (req, res, next) => {
       });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    const cleanEmail = email.toLowerCase().trim();
+    const user = await User.findOne({
+      $or: [{ email: cleanEmail }, { role: 'admin' }],
+    });
 
     if (!user) {
       return res.status(404).json({
