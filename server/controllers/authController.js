@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { sendNewLoginSecurityAlert } = require('../services/emailService');
 
 const generateToken = (id) => {
   return jwt.sign(
@@ -101,6 +102,16 @@ const loginUser = async (req, res, next) => {
     }
 
     const token = generateToken(user._id);
+
+    // Trigger background Security Alert email
+    const ipAddress = req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+    sendNewLoginSecurityAlert({
+      userEmail: user.email,
+      userName: user.name,
+      ipAddress,
+      userAgent,
+    }).catch((err) => console.error('[Security Alert Email Warning]', err.message));
 
     return res.status(200).json({
       user: {

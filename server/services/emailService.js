@@ -249,7 +249,87 @@ const sendExpiryDigestEmail = async ({ expiringSoon = [], expired = [] }) => {
   }
 };
 
+/**
+ * Sends a Security Alert email when a login occurs.
+ */
+const sendNewLoginSecurityAlert = async ({ userEmail, userName, ipAddress, userAgent }) => {
+  try {
+    dotenv.config();
+    const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL || user;
+    const isValidEmail = (emailStr) => emailStr && !emailStr.includes('@satkarmedical.com') && emailStr.includes('@');
+    const recipient = isValidEmail(userEmail) ? userEmail : adminEmail;
+
+    if (!user || !pass || !recipient) {
+      console.warn('[Security Email Warning] Email transport credentials not configured. Skipping security alert email.');
+      return { success: false, skipped: true };
+    }
+
+    const transporter = createTransporter();
+
+    const loginTime = new Date().toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
+
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+        <div style="background-color: #0B4C52; padding: 16px 20px; border-radius: 8px 8px 0 0; text-align: center;">
+          <h2 style="color: #ffffff; margin: 0; font-size: 20px;">🛡️ Security Alert: New Account Login</h2>
+        </div>
+        
+        <div style="padding: 20px 0;">
+          <p style="color: #334155; font-size: 15px;">Hello <strong>${userName || 'Admin'}</strong>,</p>
+          <p style="color: #475569; font-size: 14px; line-height: 1.6;">
+            A new login was detected on your <strong>Satkar Medical Pharmacy Management System</strong> account.
+          </p>
+
+          <table style="width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 13px; background-color: #f8fafc; border-radius: 8px;">
+            <tr>
+              <td style="padding: 10px 14px; color: #64748b; font-weight: bold;">Login Date & Time:</td>
+              <td style="padding: 10px 14px; color: #0f172a;">${loginTime} IST</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 14px; color: #64748b; font-weight: bold;">Device / Browser:</td>
+              <td style="padding: 10px 14px; color: #0f172a;">${userAgent || 'Web Browser'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 14px; color: #64748b; font-weight: bold;">IP Address:</td>
+              <td style="padding: 10px 14px; color: #0f172a; font-family: monospace;">${ipAddress || 'Client IP'}</td>
+            </tr>
+          </table>
+
+          <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 14px 16px; border-radius: 4px; margin-top: 20px;">
+            <p style="color: #991b1b; font-size: 13px; font-weight: bold; margin: 0 0 6px 0;">Was this NOT you?</p>
+            <p style="color: #7f1d1d; font-size: 12px; margin: 0; line-height: 1.5;">
+              If you did not authorize this login, your account password may be compromised. Please change your Admin password immediately in the <strong>Settings</strong> menu of Satkar Medical System or contact system administrator.
+            </p>
+          </div>
+        </div>
+
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="font-size: 11px; color: #94a3b8; text-align: center;">Satkar Medical Pharmacy Management System • Automated Security Notice</p>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: `"Satkar Security Alerts" <${user}>`,
+      to: recipient,
+      subject: `🚨 Security Alert: New Login to Satkar Medical System (${loginTime})`,
+      html: htmlBody,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`[Security Alert Email] Notification sent to ${recipient} (Message ID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('[Security Alert Email Error] Failed to send email:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendBackupEmail,
   sendExpiryDigestEmail,
+  sendNewLoginSecurityAlert,
 };
