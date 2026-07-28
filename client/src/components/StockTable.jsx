@@ -181,7 +181,18 @@ export function StockTable({ storeType = 'medical' }) {
       }
     }
 
-    return { totalQty, masterTotalQty, nearestBatch, worstStatus };
+    // Find latest stock entry/received date
+    let latestStockDate = null;
+    if (batches.length > 0) {
+      const sortedByDate = [...batches].sort(
+        (a, b) => new Date(b.receivedDate || b.createdAt) - new Date(a.receivedDate || a.createdAt)
+      );
+      latestStockDate = sortedByDate[0].receivedDate || sortedByDate[0].createdAt;
+    } else {
+      latestStockDate = item.createdAt;
+    }
+
+    return { totalQty, masterTotalQty, nearestBatch, latestStockDate, worstStatus };
   };
 
   const formatDate = (dateString) => {
@@ -438,6 +449,7 @@ export function StockTable({ storeType = 'medical' }) {
               <TableHead className="text-center font-mono">
                 {viewMode === 'master_catalog' ? 'Master Recorded Stock (Fixed)' : 'Total Available Qty'}
               </TableHead>
+              <TableHead className="font-mono">Stock Date</TableHead>
               <TableHead className="font-mono">Nearest Expiry</TableHead>
               <TableHead className="text-center">Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -445,7 +457,7 @@ export function StockTable({ storeType = 'medical' }) {
           </TableHeader>
           <TableBody>
             {items.map((item) => {
-              const { totalQty, masterTotalQty, nearestBatch, worstStatus } = getItemSummary(item);
+              const { totalQty, masterTotalQty, nearestBatch, latestStockDate, worstStatus } = getItemSummary(item);
               const isExpanded = expandedItemId === item._id;
               const batches = item.batches || [];
 
@@ -500,6 +512,17 @@ export function StockTable({ storeType = 'medical' }) {
                         <span className={totalQty === 0 ? 'text-amber-600 font-bold' : 'text-emerald-700 font-bold'}>
                           {totalQty}
                         </span>
+                      )}
+                    </TableCell>
+
+                    <TableCell className="font-mono text-xs text-teal-800 font-medium">
+                      {latestStockDate ? (
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5 text-teal-600" />
+                          <span>{formatDate(latestStockDate)}</span>
+                        </div>
+                      ) : (
+                        <span className="italic text-gray-400">N/A</span>
                       )}
                     </TableCell>
 
@@ -584,7 +607,7 @@ export function StockTable({ storeType = 'medical' }) {
                   {/* Expanded Nested Batches Sub-table */}
                   {isExpanded && (
                     <TableRow className="bg-teal-50/20">
-                      <TableCell colSpan={storeType === 'medical' ? 9 : 8} className="p-4 pl-12">
+                      <TableCell colSpan={storeType === 'medical' ? 10 : 9} className="p-4 pl-12">
                         <div className="rounded-xl border border-teal-200/80 bg-white p-3 shadow-inner">
                           <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100">
                             <h4 className="text-xs font-heading font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
