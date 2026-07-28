@@ -6,7 +6,7 @@ const generateToken = (id) => {
   return jwt.sign(
     { id },
     process.env.JWT_SECRET || 'satkar_medical_jwt_secret_key_2026_safe',
-    { expiresIn: '7d' }
+    { expiresIn: '365d' }
   );
 };
 
