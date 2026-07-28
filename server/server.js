@@ -26,12 +26,33 @@ connectDB().then(() => {
 
 const app = express();
 
-// Middleware
+// PWA & Local Network Cross-Origin Resource Sharing
 app.use(cors({
   origin: true,
   credentials: true,
 }));
-app.use(express.json());
+
+// Body parser with 50MB limit for high-resolution invoice photos
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// NoSQL Operator Injection Sanitization Middleware
+app.use((req, res, next) => {
+  if (req.body && typeof req.body === 'object') {
+    const sanitize = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      Object.keys(obj).forEach((key) => {
+        if (key.startsWith('$') || key.includes('.')) {
+          delete obj[key];
+        } else if (typeof obj[key] === 'object') {
+          sanitize(obj[key]);
+        }
+      });
+    };
+    sanitize(req.body);
+  }
+  next();
+});
 
 // API Routes
 app.use('/api/auth', authRoutes);
