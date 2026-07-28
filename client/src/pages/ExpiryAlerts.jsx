@@ -33,6 +33,7 @@ export function ExpiryAlerts() {
 
   const [activeTab, setActiveTab] = useState(initialTab); // 'expiring' | 'expired'
   const [storeType, setStoreType] = useState('all'); // 'all' | 'medical' | 'provision'
+  const [filterDate, setFilterDate] = useState(''); // Filter by target expiry date
 
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -161,6 +162,19 @@ export function ExpiryAlerts() {
     return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
+  const displayedBatches = batches.filter((b) => {
+    if (!filterDate) return true;
+    if (!b.expiryDate) return false;
+    const batchExpDate = new Date(b.expiryDate);
+    const targetDate = new Date(filterDate);
+    if (isNaN(batchExpDate.getTime()) || isNaN(targetDate.getTime())) return true;
+    
+    batchExpDate.setHours(0, 0, 0, 0);
+    targetDate.setHours(0, 0, 0, 0);
+
+    return batchExpDate <= targetDate;
+  });
+
   return (
     <div className="relative min-h-screen p-6 md:p-8 bg-background">
       {/* Prominent Logo Watermark backdrop */}
@@ -220,18 +234,42 @@ export function ExpiryAlerts() {
             </button>
           </div>
 
-          {/* Store Filter */}
-          <div className="flex items-center gap-2 self-end sm:self-auto">
-            <Filter className="w-3.5 h-3.5 text-muted" />
-            <Select
-              value={storeType}
-              onChange={(e) => setStoreType(e.target.value)}
-              className="w-40 text-xs py-1.5"
-            >
-              <option value="all">All Stores</option>
-              <option value="medical">Pharmacy Only</option>
-              <option value="provision">Provision Store</option>
-            </Select>
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-3 self-end sm:self-auto">
+            {/* Target Expiry Date Filter Input */}
+            <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-xl">
+              <Calendar className="w-3.5 h-3.5 text-secondary" />
+              <Label htmlFor="filterDate" className="text-xs font-semibold text-gray-700 whitespace-nowrap">Target Expiry Date:</Label>
+              <Input
+                id="filterDate"
+                type="date"
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+                className="w-36 text-xs py-1 h-7 font-mono bg-white"
+              />
+              {filterDate && (
+                <button
+                  onClick={() => setFilterDate('')}
+                  className="text-xs font-medium text-red-600 hover:text-red-800 px-1.5 py-0.5 rounded hover:bg-red-50"
+                  title="Clear date filter"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Filter className="w-3.5 h-3.5 text-muted" />
+              <Select
+                value={storeType}
+                onChange={(e) => setStoreType(e.target.value)}
+                className="w-36 text-xs py-1.5"
+              >
+                <option value="all">All Stores</option>
+                <option value="medical">Pharmacy Only</option>
+                <option value="provision">Provision Store</option>
+              </Select>
+            </div>
           </div>
         </div>
 
@@ -255,17 +293,21 @@ export function ExpiryAlerts() {
         )}
 
         {/* STATE 3: EMPTY */}
-        {!loading && !error && batches.length === 0 && (
+        {!loading && !error && displayedBatches.length === 0 && (
           <Card className="p-12 text-center flex flex-col items-center justify-center gap-3 bg-white/90">
             <div className="w-12 h-12 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center">
               <CheckCircle2 className="w-7 h-7" />
             </div>
             <div>
               <h3 className="text-base font-bold text-teal-800">
-                {activeTab === 'expiring' ? 'All Stock is Fresh!' : 'No Expired Batches'}
+                {filterDate
+                  ? `No Batches Expiring On or Before ${formatDate(filterDate)}`
+                  : activeTab === 'expiring' ? 'All Stock is Fresh!' : 'No Expired Batches'}
               </h3>
               <p className="text-xs text-muted mt-1 max-w-sm">
-                {activeTab === 'expiring'
+                {filterDate
+                  ? `There are no batches matching the selected target expiry date ${formatDate(filterDate)}.`
+                  : activeTab === 'expiring'
                   ? 'No items or batches are set to expire in the next 30 days.'
                   : 'There are zero expired batches in your inventory.'}
               </p>
@@ -274,7 +316,7 @@ export function ExpiryAlerts() {
         )}
 
         {/* STATE 4: POPULATED DATA TABLE */}
-        {!loading && !error && batches.length > 0 && (
+        {!loading && !error && displayedBatches.length > 0 && (
           <Table>
             <TableHeader>
               <TableRow>
@@ -290,7 +332,7 @@ export function ExpiryAlerts() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {batches.map((batch) => {
+              {displayedBatches.map((batch) => {
                 const item = batch.itemId || {};
                 const isExpired = activeTab === 'expired';
 
