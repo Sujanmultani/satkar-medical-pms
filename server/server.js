@@ -32,9 +32,9 @@ app.use(cors({
   credentials: true,
 }));
 
-// Body parser with 50MB limit for high-resolution invoice photos
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Body parser with 100MB limit for large high-resolution invoice photos
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 // NoSQL Operator Injection Sanitization Middleware
 app.use((req, res, next) => {

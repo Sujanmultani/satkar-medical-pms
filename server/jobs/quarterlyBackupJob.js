@@ -222,15 +222,15 @@ const runQuarterlyBackup = async () => {
 };
 
 /**
- * Starts cron schedule for quarterly backup (2:00 AM on 1st of every 3rd month: Jan, Apr, Jul, Oct)
+ * Starts cron schedule for monthly backup (2:00 AM on 1st of every month)
  */
 const startQuarterlyBackupCron = () => {
-  // Schedule: 0 2 1 */3 * (2:00 AM on the 1st of every 3rd month)
-  cron.schedule('0 2 1 */3 *', async () => {
-    console.log('[Quarterly Backup Cron] Triggered scheduled quarterly data backup...');
+  // Schedule: 0 2 1 * * (2:00 AM on the 1st of every month)
+  cron.schedule('0 2 1 * *', async () => {
+    console.log('[Monthly Backup Cron] Triggered scheduled monthly data backup...');
     await runQuarterlyBackup();
   });
-  console.log('[Quarterly Backup Cron] Scheduled quarterly backup cron job (0 2 1 */3 *).');
+  console.log('[Monthly Backup Cron] Scheduled monthly backup cron job (0 2 1 * *).');
 };
 
 module.exports = {

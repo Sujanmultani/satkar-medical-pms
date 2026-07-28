@@ -8,7 +8,7 @@ const { protect } = require('../middleware/authMiddleware');
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50 MB limit for large high-resolution photos
+    fileSize: 100 * 1024 * 1024, // 100 MB limit for large high-resolution photos
   },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
