@@ -255,6 +255,8 @@ const sendExpiryDigestEmail = async ({ expiringSoon = [], expired = [] }) => {
 const sendNewLoginSecurityAlert = async ({ userEmail, userName, ipAddress, userAgent }) => {
   try {
     dotenv.config();
+    const user = process.env.EMAIL_USER || process.env.GMAIL_USER;
+    const pass = process.env.EMAIL_PASS || process.env.EMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASSWORD;
     const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL || user;
     const isValidEmail = (emailStr) => emailStr && !emailStr.includes('@satkarmedical.com') && emailStr.includes('@');
     const recipient = isValidEmail(userEmail) ? userEmail : adminEmail;
