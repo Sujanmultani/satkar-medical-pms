@@ -34,7 +34,7 @@ const sendBackupEmail = async (fileBuffer, exportDateISO, counts = {}, fileType 
     dotenv.config();
     const user = process.env.EMAIL_USER || process.env.GMAIL_USER;
     const pass = process.env.EMAIL_PASS || process.env.EMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASSWORD;
-    const recipient = process.env.ADMIN_NOTIFICATION_EMAIL || user;
+    const recipient = process.env.ADMIN_NOTIFICATION_EMAIL || 'satkarmedical8@gmail.com';
 
     if (!user || !pass || !recipient) {
       console.warn('[Backup Email Warning] Email transport credentials (EMAIL_USER/EMAIL_APP_PASSWORD) or recipient (ADMIN_NOTIFICATION_EMAIL) not set in environment. Backup buffer generated successfully.');
@@ -126,7 +126,7 @@ const sendExpiryDigestEmail = async ({ expiringSoon = [], expired = [] }) => {
 
     const user = process.env.EMAIL_USER || process.env.GMAIL_USER;
     const pass = process.env.EMAIL_PASS || process.env.EMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASSWORD;
-    const recipient = process.env.ADMIN_NOTIFICATION_EMAIL || user;
+    const recipient = process.env.ADMIN_NOTIFICATION_EMAIL || 'satkarmedical8@gmail.com';
 
     if (!user || !pass || !recipient) {
       console.warn('[Expiry Email Warning] Email transport credentials (EMAIL_USER/EMAIL_APP_PASSWORD) or recipient (ADMIN_NOTIFICATION_EMAIL) not set in environment.');
@@ -257,9 +257,7 @@ const sendNewLoginSecurityAlert = async ({ userEmail, userName, ipAddress, userA
     dotenv.config();
     const user = process.env.EMAIL_USER || process.env.GMAIL_USER;
     const pass = process.env.EMAIL_PASS || process.env.EMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASSWORD;
-    const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL || user;
-    const isValidEmail = (emailStr) => emailStr && !emailStr.includes('@satkarmedical.com') && emailStr.includes('@');
-    const recipient = isValidEmail(userEmail) ? userEmail : adminEmail;
+    const recipient = process.env.ADMIN_NOTIFICATION_EMAIL || 'satkarmedical8@gmail.com';
 
     if (!user || !pass || !recipient) {
       console.warn('[Security Email Warning] Email transport credentials not configured. Skipping security alert email.');
