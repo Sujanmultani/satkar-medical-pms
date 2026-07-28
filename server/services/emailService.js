@@ -330,8 +330,62 @@ const sendNewLoginSecurityAlert = async ({ userEmail, userName, ipAddress, userA
   }
 };
 
+/**
+ * Sends 6-digit OTP email for Admin Password Reset
+ */
+const sendPasswordResetOtpEmail = async ({ userEmail, userName, otp }) => {
+  try {
+    const transporter = createTransporter();
+    const user = process.env.EMAIL_USER;
+
+    if (!transporter || !user) {
+      console.warn('[Password Reset Email Warning] Email configuration missing in .env');
+      return { success: false, error: 'Email configuration missing' };
+    }
+
+    const recipient = (userEmail && !userEmail.includes('@satkarmedical.com')) 
+      ? userEmail 
+      : (process.env.ADMIN_NOTIFICATION_EMAIL || 'satkarmedical8@gmail.com');
+
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; max-width: 550px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
+        <h2 style="color: #0f766e; margin-bottom: 5px;">🔑 Password Reset Request</h2>
+        <p style="color: #64748b; font-size: 13px; margin-top: 0;">Satkar Medical Pharmacy Management System</p>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;" />
+
+        <p style="font-size: 14px; color: #1e293b;">Hello <strong>${userName || 'Admin'}</strong>,</p>
+        <p style="font-size: 14px; color: #334155;">You requested to reset your Satkar Medical Admin account password. Use the 6-digit OTP code below to set your new password:</p>
+
+        <div style="background-color: #f0fdf4; border: 2px dashed #0d9488; border-radius: 8px; padding: 15px; text-align: center; margin: 20px 0;">
+          <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #0f766e;">${otp}</span>
+          <p style="font-size: 12px; color: #64748b; margin-top: 8px; margin-bottom: 0;">Valid for 15 minutes. Do not share this code with anyone.</p>
+        </div>
+
+        <p style="font-size: 12px; color: #64748b;">If you did not request a password reset, please ignore this email.</p>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="font-size: 11px; color: #94a3b8; text-align: center;">Satkar Medical PMS • Security Verification</p>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: `"Satkar Medical Admin Security" <${user}>`,
+      to: recipient,
+      subject: `🔑 ${otp} is your Satkar Medical Password Reset Code`,
+      html: htmlBody,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`[Password Reset Email] Sent OTP code to ${recipient} (Message ID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('[Password Reset Email Error] Failed to send OTP:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendBackupEmail,
   sendExpiryDigestEmail,
   sendNewLoginSecurityAlert,
+  sendPasswordResetOtpEmail,
 };

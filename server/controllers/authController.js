@@ -183,9 +183,109 @@ const changePassword = async (req, res, next) => {
   }
 };
 
+// @desc    Generate and send 6-digit OTP for Forgot Password
+// @route   POST /api/auth/forgot-password
+// @access  Public
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({
+        error: { code: 'MISSING_EMAIL', message: 'Please provide your registered admin email address.' },
+      });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    if (!user) {
+      return res.status(200).json({
+        message: 'If the email is registered, a 6-digit OTP code has been sent to your email address.',
+      });
+    }
+
+    // Generate 6-digit numeric OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpire = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes validity
+
+    user.resetOtp = otp;
+    user.resetOtpExpire = otpExpire;
+    await user.save();
+
+    // Send OTP via Email
+    const { sendPasswordResetOtpEmail } = require('../services/emailService');
+    await sendPasswordResetOtpEmail({
+      userEmail: user.email,
+      userName: user.name,
+      otp,
+    }).catch((err) => console.error('[Forgot Password Email Error]', err.message));
+
+    return res.status(200).json({
+      message: 'A 6-digit OTP code has been sent to your admin email address.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reset password using 6-digit OTP
+// @route   POST /api/auth/reset-password-otp
+// @access  Public
+const resetPasswordWithOtp = async (req, res, next) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({
+        error: { code: 'MISSING_FIELDS', message: 'Please provide email, 6-digit OTP code, and new password.' },
+      });
+    }
+
+    if (newPassword.length < 4) {
+      return res.status(400).json({
+        error: { code: 'WEAK_PASSWORD', message: 'New password must be at least 4 characters long.' },
+      });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+
+    if (!user) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'User account not found.' },
+      });
+    }
+
+    // Verify OTP code & expiration
+    if (!user.resetOtp || user.resetOtp !== otp.trim()) {
+      return res.status(400).json({
+        error: { code: 'INVALID_OTP', message: 'Invalid 6-digit OTP verification code.' },
+      });
+    }
+
+    if (!user.resetOtpExpire || new Date() > new Date(user.resetOtpExpire)) {
+      return res.status(400).json({
+        error: { code: 'EXPIRED_OTP', message: 'OTP verification code has expired. Please request a new code.' },
+      });
+    }
+
+    // Hash and update password
+    const salt = await bcrypt.genSalt(10);
+    user.passwordHash = await bcrypt.hash(newPassword, salt);
+    user.resetOtp = null;
+    user.resetOtpExpire = null;
+    await user.save();
+
+    return res.status(200).json({
+      message: 'Admin password reset successfully! You can now log in with your new password.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registerAdmin,
   loginUser,
   getMe,
   changePassword,
+  forgotPassword,
+  resetPasswordWithOtp,
 };
