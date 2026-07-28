@@ -10,6 +10,7 @@ export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initial
     batchNo: '',
     mfgDate: '',
     expiryDate: '',
+    receivedDate: new Date().toISOString().split('T')[0],
     qty: 0,
     purchaseRate: 0,
     mrp: 0,
@@ -32,6 +33,7 @@ export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initial
         batchNo: initialData.batchNo || '',
         mfgDate: formatDateForInput(initialData.mfgDate),
         expiryDate: formatDateForInput(initialData.expiryDate),
+        receivedDate: formatDateForInput(initialData.receivedDate || initialData.createdAt) || new Date().toISOString().split('T')[0],
         qty: initialData.qty !== undefined ? initialData.qty : 0,
         purchaseRate: initialData.purchaseRate !== undefined ? initialData.purchaseRate : 0,
         mrp: initialData.mrp !== undefined ? initialData.mrp : 0,
@@ -43,6 +45,7 @@ export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initial
         batchNo: '',
         mfgDate: '',
         expiryDate: '',
+        receivedDate: new Date().toISOString().split('T')[0],
         qty: 10,
         purchaseRate: 0,
         mrp: 0,
@@ -161,7 +164,19 @@ export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initial
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <Label htmlFor="receivedDate">Stock Entry Date</Label>
+            <Input
+              id="receivedDate"
+              name="receivedDate"
+              type="date"
+              value={formData.receivedDate}
+              onChange={handleChange}
+              className="mt-1 font-mono"
+            />
+          </div>
+
           <div>
             <Label htmlFor="mfgDate">Mfg Date (Optional)</Label>
             <Input

@@ -616,6 +616,7 @@ export function StockTable({ storeType = 'medical' }) {
                                 <thead className="bg-gray-50 text-gray-500 font-mono text-[10px] uppercase">
                                   <tr>
                                     <th className="py-2 px-3">Batch No</th>
+                                    <th className="py-2 px-3">Stock Date</th>
                                     <th className="py-2 px-3">Supplier</th>
                                     <th className="py-2 px-3">Mfg Date</th>
                                     <th className="py-2 px-3">Expiry</th>
@@ -638,6 +639,9 @@ export function StockTable({ storeType = 'medical' }) {
                                   {batches.map((batch) => (
                                     <tr key={batch._id} className="hover:bg-gray-50/80">
                                       <td className="py-2 px-3 font-semibold text-primary">{batch.batchNo}</td>
+                                      <td className="py-2 px-3 text-teal-800 font-medium text-[11px] font-mono">
+                                        {formatDate(batch.receivedDate || batch.createdAt)}
+                                      </td>
                                       <td className="py-2 px-3 text-gray-700 font-sans font-medium">
                                         {batch.supplierId?.name ? (
                                           <div className="flex items-center gap-1.5">

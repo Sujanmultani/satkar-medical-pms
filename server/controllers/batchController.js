@@ -62,6 +62,7 @@ const createBatch = async (req, res, next) => {
       batchNo: batchNo.trim(),
       mfgDate: mfgDate ? new Date(mfgDate) : null,
       expiryDate: new Date(expiryDate),
+      receivedDate: req.body.receivedDate ? new Date(req.body.receivedDate) : new Date(),
       qty: numQty,
       initialQty: numQty,
       purchaseRate: numPurchaseRate,
@@ -130,6 +131,7 @@ const updateBatch = async (req, res, next) => {
 
     if (batchNo !== undefined) batch.batchNo = batchNo.trim();
     if (mfgDate !== undefined) batch.mfgDate = mfgDate ? new Date(mfgDate) : null;
+    if (req.body.receivedDate !== undefined) batch.receivedDate = req.body.receivedDate ? new Date(req.body.receivedDate) : new Date();
     if (expiryDate !== undefined) {
       batch.expiryDate = new Date(expiryDate);
       batch.status = computeBatchStatus(expiryDate);

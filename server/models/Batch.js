@@ -25,6 +25,10 @@ const batchSchema = new mongoose.Schema(
       type: Date,
       index: true,
     },
+    receivedDate: {
+      type: Date,
+      default: Date.now,
+    },
     qty: {
       type: Number,
       required: true,

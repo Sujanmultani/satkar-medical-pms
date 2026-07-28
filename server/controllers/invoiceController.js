@@ -194,6 +194,7 @@ const confirmInvoice = async (req, res, next) => {
         batchNo: batchNo.trim(),
         mfgDate: lineItem.mfgDate ? new Date(lineItem.mfgDate) : null,
         expiryDate: batchExpiry,
+        receivedDate: invoiceDate ? new Date(invoiceDate) : new Date(),
         qty: numQty,
         initialQty: numQty,
         purchaseRate: numPurchaseRate,
