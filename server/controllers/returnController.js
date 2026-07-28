@@ -6,19 +6,38 @@ const Bill = require('../models/Bill');
 // Helper to generate unique return number (RET-YYYYMMDD-XXXX)
 const generateReturnNumber = async (dateObj) => {
   const d = dateObj ? new Date(dateObj) : new Date();
-  const dateStr = d.toISOString().split('T')[0].replace(/-/g, '');
+  const dateStr = isNaN(d.getTime())
+    ? new Date().toISOString().split('T')[0].replace(/-/g, '')
+    : d.toISOString().split('T')[0].replace(/-/g, '');
 
-  const startOfDay = new Date(d);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(d);
-  endOfDay.setHours(23, 59, 59, 999);
+  const regex = new RegExp(`^RET-${dateStr}-`);
+  
+  // Find highest existing sequence return for this date
+  const latestReturn = await Return.findOne({ returnNo: regex })
+    .sort({ returnNo: -1 })
+    .select('returnNo')
+    .lean();
 
-  const countToday = await Return.countDocuments({
-    createdAt: { $gte: startOfDay, $lte: endOfDay },
-  });
+  let nextSeq = 1;
+  if (latestReturn && latestReturn.returnNo) {
+    const parts = latestReturn.returnNo.split('-');
+    const lastSeq = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(lastSeq)) {
+      nextSeq = lastSeq + 1;
+    }
+  }
 
-  const sequence = String(countToday + 1).padStart(4, '0');
-  return `RET-${dateStr}-${sequence}`;
+  // Safety retry loop to ensure absolute uniqueness
+  let candidateReturnNo = `RET-${dateStr}-${String(nextSeq).padStart(4, '0')}`;
+  let exists = await Return.exists({ returnNo: candidateReturnNo });
+
+  while (exists) {
+    nextSeq++;
+    candidateReturnNo = `RET-${dateStr}-${String(nextSeq).padStart(4, '0')}`;
+    exists = await Return.exists({ returnNo: candidateReturnNo });
+  }
+
+  return candidateReturnNo;
 };
 
 // @desc    Create new Return record (supplier or customer)

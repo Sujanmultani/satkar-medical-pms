@@ -11,7 +11,7 @@ try {
 
 const connectDB = async () => {
   const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/satkar_medical';
-  const localUri = 'mongodb://127.0.0.1:27017/satkar_medical';
+  const localUri = process.env.LOCAL_MONGO_URI || 'mongodb://127.0.0.1:27017/satkar_medical';
 
   const options = {
     serverSelectionTimeoutMS: 8000,

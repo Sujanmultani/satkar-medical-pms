@@ -139,7 +139,7 @@ const updateBatch = async (req, res, next) => {
     if (qty !== undefined) {
       const newQtyVal = Math.max(0, Number(qty) || 0);
       batch.qty = newQtyVal;
-      if (!batch.initialQty || batch.initialQty < newQtyVal) {
+      if (batch.initialQty === undefined || batch.initialQty === null) {
         batch.initialQty = newQtyVal;
       }
     }
