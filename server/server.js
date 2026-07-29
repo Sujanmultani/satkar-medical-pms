@@ -1,6 +1,11 @@
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet');
+let helmet;
+try {
+  helmet = require('helmet');
+} catch (e) {
+  helmet = null;
+}
 const dotenv = require('dotenv');
 const connectDB = require('./config/db.js');
 const authRoutes = require('./routes/authRoutes.js');
@@ -28,7 +33,9 @@ connectDB().then(() => {
 const app = express();
 
 // HTTP Security Headers
-app.use(helmet({ contentSecurityPolicy: false }));
+if (helmet) {
+  app.use(helmet({ contentSecurityPolicy: false }));
+}
 
 // Cross-Origin Resource Sharing locked to CLIENT_URL
 app.use(cors({
