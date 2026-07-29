@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { getItems } from '@/services/itemService';
 import { createBill } from '@/services/billService';
+import { getSettings, updateSettings } from '@/services/settingsService';
 import { LogoWatermark } from '@/components/LogoWatermark';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -337,10 +338,39 @@ export function Billing() {
 
             {/* Item Search & Batch Picker */}
             <Card className="p-5 bg-white/90">
-              <h3 className="text-sm font-heading font-bold text-primary mb-4 flex items-center gap-2">
-                <Search className="w-4 h-4 text-secondary" />
-                <span>Search & Add Medicines / Items</span>
-              </h3>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-gray-100 pb-3">
+                <h3 className="text-sm font-heading font-bold text-primary flex items-center gap-2">
+                  <Search className="w-4 h-4 text-secondary" />
+                  <span>Search & Add Medicines / Items</span>
+                </h3>
+
+                {/* Live Default Billing GST Quick Setting */}
+                <div className="flex items-center gap-2 bg-teal-50 px-3 py-1.5 rounded-lg border border-teal-200 shrink-0">
+                  <span className="text-xs font-semibold text-teal-900">Default Billing GST %:</span>
+                  <div className="relative w-16">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      placeholder="0"
+                      value={defaultGstRate}
+                      onChange={async (e) => {
+                        const val = e.target.value;
+                        setDefaultGstRate(val);
+                        const numVal = Number(val) || 0;
+                        try {
+                          await updateSettings({ defaultGstPercent: numVal });
+                        } catch (err) {
+                          console.error('Failed to update live GST setting:', err);
+                        }
+                      }}
+                      className="w-full px-1.5 py-0.5 text-xs font-mono font-bold text-center bg-white text-teal-950 rounded border border-teal-300 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    />
+                  </div>
+                  <span className="text-xs font-bold text-teal-700">%</span>
+                </div>
+              </div>
 
               <div className="space-y-4">
                 {/* Search Input */}
