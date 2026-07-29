@@ -22,6 +22,12 @@ const settingsSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    defaultGstPercent: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
   },
   {
     timestamps: true,

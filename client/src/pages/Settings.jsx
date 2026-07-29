@@ -27,6 +27,7 @@ export function Settings() {
   const [gstin, setGstin] = useState('');
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
+  const [defaultGstPercent, setDefaultGstPercent] = useState('0');
   
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -53,6 +54,7 @@ export function Settings() {
           setGstin(res.data.gstin || '');
           setAddress(res.data.address || '');
           setPhone(res.data.phone || '');
+          setDefaultGstPercent(res.data.defaultGstPercent !== undefined ? String(res.data.defaultGstPercent) : '0');
         }
       } catch (err) {
         console.error('Failed to load business settings:', err);
@@ -76,14 +78,16 @@ export function Settings() {
         gstin,
         address,
         phone,
+        defaultGstPercent: Number(defaultGstPercent) || 0,
       });
       if (res.data) {
         setBusinessName(res.data.businessName);
         setGstin(res.data.gstin);
         setAddress(res.data.address);
         setPhone(res.data.phone);
+        setDefaultGstPercent(res.data.defaultGstPercent !== undefined ? String(res.data.defaultGstPercent) : '0');
       }
-      setSettingsSuccess('Business information updated successfully! Printed invoices will reflect these details.');
+      setSettingsSuccess('Business & Default GST configuration updated successfully!');
     } catch (err) {
       console.error('Failed to update settings:', err);
       setSettingsError(err.response?.data?.error?.message || 'Failed to update business settings.');
@@ -382,6 +386,23 @@ export function Settings() {
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         className="text-xs font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center justify-between">
+                        <span>Default Billing GST Rate (%)</span>
+                        <span className="text-[10px] text-teal-700 font-mono font-bold">Auto-fills in Billing</span>
+                      </label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        placeholder="0 (or 12, 18)"
+                        value={defaultGstPercent}
+                        onChange={(e) => setDefaultGstPercent(e.target.value)}
+                        className="text-xs font-mono font-bold border-teal-200 focus:border-teal-500"
                       />
                     </div>
                   </div>

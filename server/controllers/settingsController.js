@@ -12,6 +12,7 @@ const getSettings = async (req, res, next) => {
         gstin: '',
         address: 'Main Road, Jambusar',
         phone: '',
+        defaultGstPercent: 0,
       });
     }
     return res.status(200).json({ data: settings });
@@ -25,7 +26,7 @@ const getSettings = async (req, res, next) => {
 // @access  Private
 const updateSettings = async (req, res, next) => {
   try {
-    const { businessName, gstin, address, phone } = req.body;
+    const { businessName, gstin, address, phone, defaultGstPercent } = req.body;
 
     let settings = await Settings.findOne();
     if (!settings) {
@@ -36,6 +37,10 @@ const updateSettings = async (req, res, next) => {
     if (gstin !== undefined) settings.gstin = gstin.trim();
     if (address !== undefined) settings.address = address.trim();
     if (phone !== undefined) settings.phone = phone.trim();
+    if (defaultGstPercent !== undefined) {
+      const parsedGst = parseFloat(defaultGstPercent);
+      settings.defaultGstPercent = isNaN(parsedGst) || parsedGst < 0 ? 0 : Math.min(parsedGst, 100);
+    }
 
     await settings.save();
 

@@ -31,6 +31,7 @@ export function Billing() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [billDate, setBillDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [paymentMode, setPaymentMode] = useState('Cash');
+  const [defaultGstRate, setDefaultGstRate] = useState(0);
 
   // Item Search & Picker state
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,6 +48,21 @@ export function Billing() {
   const [errorMessage, setErrorMessage] = useState('');
   const [createdBill, setCreatedBill] = useState(null);
   const [isPrintOpen, setIsPrintOpen] = useState(false);
+
+  // Load Admin Configured Default GST Rate on mount
+  useEffect(() => {
+    async function fetchStoreSettings() {
+      try {
+        const res = await getSettings();
+        if (res?.data?.defaultGstPercent !== undefined) {
+          setDefaultGstRate(Number(res.data.defaultGstPercent) || 0);
+        }
+      } catch (err) {
+        console.error('Failed to fetch default GST rate:', err);
+      }
+    }
+    fetchStoreSettings();
+  }, []);
 
   // Search Items as user types
   const handleItemSearch = useCallback(async (query) => {
@@ -104,6 +120,10 @@ export function Billing() {
       updated[existingIndex].qty = newQty;
       setLineItems(updated);
     } else {
+      const initialGst = batch.gstPercent !== undefined && batch.gstPercent > 0
+        ? batch.gstPercent
+        : defaultGstRate;
+
       setLineItems([
         ...lineItems,
         {
@@ -111,7 +131,7 @@ export function Billing() {
           batch,
           qty: 1,
           rate: batch.mrp || 0,
-          gst: 0,
+          gst: initialGst || 0,
         },
       ]);
     }
