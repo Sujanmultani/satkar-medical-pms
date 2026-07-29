@@ -120,9 +120,9 @@ export function Billing() {
       updated[existingIndex].qty = newQty;
       setLineItems(updated);
     } else {
-      const initialGst = batch.gstPercent !== undefined && batch.gstPercent > 0
-        ? batch.gstPercent
-        : defaultGstRate;
+      const initialGst = defaultGstRate > 0
+        ? defaultGstRate
+        : (batch.gstPercent || 0);
 
       setLineItems([
         ...lineItems,
