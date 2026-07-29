@@ -250,15 +250,30 @@ export function Suppliers() {
                           const isPaid = batch.paymentStatus === 'paid';
                           const isUpdating = updatingBatchId === batch._id;
 
+                          // Compute fallback returnedQty if batch.returnedQty is undefined
+                          const batchReturns = (supplierDetail.returns || []).filter(
+                            (ret) =>
+                              (ret.batchId?._id || ret.batchId) === batch._id ||
+                              (ret.batchNo && ret.batchNo === batch.batchNo)
+                          );
+                          const returnedQty = batch.returnedQty !== undefined ? batch.returnedQty : batchReturns.reduce((acc, r) => acc + (r.qty || 0), 0);
+                          const isReturned = batch.isReturned || returnedQty > 0;
+
                           return (
                             <TableRow key={batch._id} className={isPaid ? 'bg-emerald-50/20' : 'bg-amber-50/20'}>
                               <TableCell className="font-semibold text-primary">
-                                <div>
+                                <div className="flex flex-wrap items-center gap-1.5">
                                   <span>{item.name || 'Unknown Item'}</span>
                                   {item.storeType && (
-                                    <Badge variant={item.storeType === 'medical' ? 'default' : 'secondary'} className="ml-2 text-[9px] px-1.5 py-0">
+                                    <Badge variant={item.storeType === 'medical' ? 'default' : 'secondary'} className="text-[9px] px-1.5 py-0">
                                       {item.storeType === 'medical' ? 'Pharmacy' : 'Provision'}
                                     </Badge>
+                                  )}
+                                  {isReturned && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 shadow-sm">
+                                      <Undo2 className="w-3 h-3 text-amber-700" />
+                                      <span>Returned ({returnedQty})</span>
+                                    </span>
                                   )}
                                 </div>
                               </TableCell>
@@ -271,7 +286,15 @@ export function Suppliers() {
 
                               <TableCell className="font-mono text-xs">{formatDate(batch.expiryDate)}</TableCell>
 
-                              <TableCell className="text-center font-mono font-bold">{batch.qty}</TableCell>
+                              <TableCell className="text-center font-mono">
+                                <div className="font-bold">{batch.qty}</div>
+                                {isReturned && (
+                                  <div className="text-[10px] font-bold text-amber-800 bg-amber-100/90 border border-amber-300 px-1.5 py-0.5 rounded mt-0.5 inline-flex items-center gap-1">
+                                    <Undo2 className="w-2.5 h-2.5 text-amber-700" />
+                                    <span>{returnedQty} Returned</span>
+                                  </div>
+                                )}
+                              </TableCell>
 
                               <TableCell className="text-right font-mono">₹{(batch.purchaseRate || 0).toFixed(2)}</TableCell>
 

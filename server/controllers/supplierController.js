@@ -138,9 +138,19 @@ const getSupplierById = async (req, res, next) => {
         totalDue += due;
       }
 
+      // Compute total returned qty for this batch from returns
+      const batchReturns = returns.filter(
+        (r) =>
+          (r.batchId && r.batchId._id ? r.batchId._id.toString() : r.batchId ? r.batchId.toString() : null) === b._id.toString() ||
+          r.batchNo === b.batchNo
+      );
+      const returnedQty = batchReturns.reduce((sum, r) => sum + (r.qty || 0), 0);
+
       return {
         ...b,
         amountDue: due,
+        returnedQty,
+        isReturned: returnedQty > 0,
       };
     });
 
