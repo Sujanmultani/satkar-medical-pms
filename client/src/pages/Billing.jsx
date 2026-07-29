@@ -54,8 +54,10 @@ export function Billing() {
     async function fetchStoreSettings() {
       try {
         const res = await getSettings();
-        if (res?.data?.defaultGstPercent !== undefined) {
-          setDefaultGstRate(Number(res.data.defaultGstPercent) || 0);
+        const settingsData = res?.data || res || {};
+        if (settingsData.defaultGstPercent !== undefined && settingsData.defaultGstPercent !== null) {
+          const gstVal = Number(settingsData.defaultGstPercent);
+          setDefaultGstRate(isNaN(gstVal) ? 0 : gstVal);
         }
       } catch (err) {
         console.error('Failed to fetch default GST rate:', err);
