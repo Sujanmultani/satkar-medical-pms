@@ -57,12 +57,19 @@ const getDashboardSummary = async (req, res, next) => {
     // Overall Expired Supplier Returns Summary
     const expiredReturnsCount = await Return.countDocuments({ type: 'supplier', reason: 'expired' });
 
+    // All-Time Lifetime Revenue Calculations
+    const allBills = await Bill.find({}).select('grandTotal totalAmount').lean();
+    const totalGrossRevenue = allBills.reduce((acc, bill) => acc + (bill.grandTotal || bill.totalAmount || 0), 0);
+    const totalRevenue = Math.max(0, roundMoney(totalGrossRevenue - customerReturnsAmount));
+
     return res.status(200).json({
       totalItems,
       totalBatchQty,
       todaySales: todayNetSales,
       todayGrossSales: roundMoney(todayGrossSales),
       todayCustomerReturnRefunds: roundMoney(todayCustomerReturnRefunds),
+      totalRevenue,
+      totalGrossRevenue: roundMoney(totalGrossRevenue),
       expiringSoonCount,
       expiredCount,
       customerReturnsCount,

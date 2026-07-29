@@ -12,7 +12,8 @@ import {
   Clock, 
   Sparkles,
   ArrowRight,
-  ScanLine
+  ScanLine,
+  TrendingUp
 } from 'lucide-react';
 
 export function Dashboard() {
@@ -23,6 +24,7 @@ export function Dashboard() {
     totalItems: 0,
     totalBatchQty: 0,
     todaySales: 0,
+    totalRevenue: 0,
     expiringSoonCount: 0,
     expiredCount: 0,
   });
@@ -77,7 +79,7 @@ export function Dashboard() {
         </div>
 
         {/* Real-Time Summary Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Today's Net Sales Card */}
           <Card 
             onClick={() => navigate('/billing')}
@@ -95,6 +97,28 @@ export function Dashboard() {
               </div>
               <p className="text-xs text-emerald-700 mt-1 flex items-center gap-1">
                 <span>{summary.todayCustomerReturnRefunds > 0 ? `Gross ₹${summary.todayGrossSales.toFixed(2)} - Returns ₹${summary.todayCustomerReturnRefunds.toFixed(2)}` : 'Net sales today'}</span>
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Total Revenue Card */}
+          <Card 
+            onClick={() => navigate('/bill-history')}
+            className="hover:border-teal-400 transition-all cursor-pointer border-l-4 border-l-teal-600 bg-teal-50/20"
+          >
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-mono text-teal-900 uppercase">Total Revenue</CardTitle>
+              <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold font-mono text-teal-950">
+                ₹{loading ? '...' : (summary.totalRevenue || 0).toFixed(2)}
+              </div>
+              <p className="text-xs text-teal-700 mt-1 flex items-center gap-1">
+                <span>All-Time Net Revenue</span>
+                <ArrowRight className="w-3 h-3" />
               </p>
             </CardContent>
           </Card>
