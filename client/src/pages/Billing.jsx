@@ -110,24 +110,23 @@ export function Billing() {
     const batch = selectedItem.batches.find((b) => b.batchId === selectedBatchId || b._id === selectedBatchId);
     if (!batch) return;
 
+    // Fetch the absolute latest Admin Settings in real-time for any number (0, 5, 10, 12, 18...)
     let activeGstRate = defaultGstRate;
-    if (activeGstRate === 0) {
-      try {
-        const res = await getSettings();
-        const s = res?.data?.data || res?.data || res || {};
-        if (s.defaultGstPercent !== undefined && s.defaultGstPercent !== null) {
-          const parsed = Number(s.defaultGstPercent);
-          if (!isNaN(parsed) && parsed > 0) {
-            activeGstRate = parsed;
-            setDefaultGstRate(parsed);
-          }
+    try {
+      const res = await getSettings();
+      const s = res?.data?.data || res?.data || res || {};
+      if (s.defaultGstPercent !== undefined && s.defaultGstPercent !== null) {
+        const parsed = Number(s.defaultGstPercent);
+        if (!isNaN(parsed)) {
+          activeGstRate = parsed;
+          setDefaultGstRate(parsed);
         }
-      } catch (e) {
-        // fallback
       }
+    } catch (e) {
+      console.error('Failed to fetch real-time settings on item add:', e);
     }
 
-    const initialGst = activeGstRate > 0 ? activeGstRate : (batch.gstPercent || 0);
+    const initialGst = activeGstRate;
 
     // Check if item+batch already added
     const existingIndex = lineItems.findIndex((l) => l.batch._id === batch._id);
@@ -148,7 +147,7 @@ export function Billing() {
           batch,
           qty: 1,
           rate: batch.mrp || 0,
-          gst: initialGst || 0,
+          gst: initialGst,
         },
       ]);
     }
