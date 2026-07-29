@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db.js');
 const authRoutes = require('./routes/authRoutes.js');
@@ -26,9 +27,12 @@ connectDB().then(() => {
 
 const app = express();
 
-// PWA & Local Network Cross-Origin Resource Sharing
+// HTTP Security Headers
+app.use(helmet({ contentSecurityPolicy: false }));
+
+// Cross-Origin Resource Sharing locked to CLIENT_URL
 app.use(cors({
-  origin: true,
+  origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true,
 }));
 

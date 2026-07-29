@@ -160,8 +160,7 @@ export function StockTable({ storeType = 'medical' }) {
   // Helper calculations per item
   const getItemSummary = (item) => {
     const batches = item.batches || [];
-    const totalQty = batches.reduce((acc, b) => acc + (b.qty || 0), 0);
-    const masterTotalQty = batches.reduce((acc, b) => acc + (b.initialQty || b.qty || 0), 0);
+    const masterTotalQty = batches.reduce((acc, b) => acc + (b.qty || 0), 0);
     
     // Find nearest expiry batch
     let nearestBatch = null;
@@ -681,7 +680,7 @@ export function StockTable({ storeType = 'medical' }) {
                                       {viewMode === 'master_catalog' ? (
                                         <>
                                           <td className="py-2 px-3 text-center font-bold text-teal-900 font-mono">
-                                            {batch.initialQty || batch.qty || 0}
+                                            {batch.qty || 0}
                                           </td>
                                           <td className="py-2 px-3 text-center font-bold text-gray-700 font-mono">{batch.qty}</td>
                                         </>
