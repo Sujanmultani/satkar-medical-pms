@@ -251,12 +251,15 @@ export function Suppliers() {
                           const isUpdating = updatingBatchId === batch._id;
 
                           // Compute fallback returnedQty if batch.returnedQty is undefined
-                          const batchReturns = (supplierDetail.returns || []).filter(
-                            (ret) =>
-                              (ret.batchId?._id || ret.batchId) === batch._id ||
-                              (ret.batchNo && ret.batchNo === batch.batchNo)
-                          );
-                          const returnedQty = batch.returnedQty !== undefined ? batch.returnedQty : batchReturns.reduce((acc, r) => acc + (r.qty || 0), 0);
+                          const batchReturns = (supplierDetail.returns || []).filter((ret) => {
+                            const bId = ret.batchId?._id ? ret.batchId._id.toString() : ret.batchId ? ret.batchId.toString() : null;
+                            const targetId = batch._id ? batch._id.toString() : null;
+                            const matchId = bId && targetId && bId === targetId;
+                            const matchBatchNo = ret.batchNo && batch.batchNo && ret.batchNo.trim().toLowerCase() === batch.batchNo.trim().toLowerCase();
+                            const matchItemName = ret.itemName && item.name && ret.itemName.trim().toLowerCase() === item.name.trim().toLowerCase();
+                            return matchId || matchBatchNo || matchItemName;
+                          });
+                          const returnedQty = batch.returnedQty !== undefined && batch.returnedQty > 0 ? batch.returnedQty : batchReturns.reduce((acc, r) => acc + (r.qty || 0), 0);
                           const isReturned = batch.isReturned || returnedQty > 0;
 
                           return (
