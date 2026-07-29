@@ -54,9 +54,9 @@ export function Billing() {
     async function fetchStoreSettings() {
       try {
         const res = await getSettings();
-        const s = res?.data?.data || res?.data || res || {};
-        if (s.defaultGstPercent !== undefined && s.defaultGstPercent !== null) {
-          const gstVal = Number(s.defaultGstPercent);
+        const settingsDoc = res?.data || res || {};
+        if (settingsDoc.defaultGstPercent !== undefined && settingsDoc.defaultGstPercent !== null) {
+          const gstVal = Number(settingsDoc.defaultGstPercent);
           setDefaultGstRate(isNaN(gstVal) ? 0 : gstVal);
         }
       } catch (err) {
@@ -114,9 +114,9 @@ export function Billing() {
     let activeGstRate = defaultGstRate;
     try {
       const res = await getSettings();
-      const s = res?.data?.data || res?.data || res || {};
-      if (s.defaultGstPercent !== undefined && s.defaultGstPercent !== null) {
-        const parsed = Number(s.defaultGstPercent);
+      const settingsDoc = res?.data || res || {};
+      if (settingsDoc.defaultGstPercent !== undefined && settingsDoc.defaultGstPercent !== null) {
+        const parsed = Number(settingsDoc.defaultGstPercent);
         if (!isNaN(parsed)) {
           activeGstRate = parsed;
           setDefaultGstRate(parsed);

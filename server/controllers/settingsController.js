@@ -14,6 +14,9 @@ const getSettings = async (req, res, next) => {
         phone: '',
         defaultGstPercent: 0,
       });
+    } else if (settings.defaultGstPercent === undefined || settings.defaultGstPercent === null) {
+      settings.defaultGstPercent = 0;
+      await settings.save();
     }
     return res.status(200).json({ data: settings });
   } catch (error) {
