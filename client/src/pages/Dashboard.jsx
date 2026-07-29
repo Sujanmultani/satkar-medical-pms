@@ -2,11 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { getDashboardSummary } from '@/services/dashboardService';
-import { getSettings, updateSettings } from '@/services/settingsService';
 import { LogoWatermark } from '@/components/LogoWatermark';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { 
   Package, 
   Layers, 
@@ -15,9 +13,7 @@ import {
   Sparkles,
   ArrowRight,
   ScanLine,
-  TrendingUp,
-  Percent,
-  Check
+  TrendingUp
 } from 'lucide-react';
 
 export function Dashboard() {
@@ -33,48 +29,21 @@ export function Dashboard() {
     expiredCount: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [defaultGstRate, setDefaultGstRate] = useState('0');
-  const [isSavingGst, setIsSavingGst] = useState(false);
-  const [gstSaveSuccess, setGstSaveSuccess] = useState(false);
 
   useEffect(() => {
-    async function loadData() {
+    async function loadSummary() {
       try {
-        const [sumRes, setRes] = await Promise.all([
-          getDashboardSummary(),
-          getSettings()
-        ]);
-        const sumData = sumRes?.data || sumRes || {};
-        setSummary(sumData);
-
-        const setData = setRes?.data || setRes || {};
-        if (setData.defaultGstPercent !== undefined && setData.defaultGstPercent !== null) {
-          setDefaultGstRate(String(setData.defaultGstPercent));
-        }
+        const res = await getDashboardSummary();
+        const data = res?.data || res || {};
+        setSummary(data);
       } catch (err) {
-        console.error('Failed to load dashboard data:', err);
+        console.error('Failed to load dashboard summary:', err);
       } finally {
         setLoading(false);
       }
     }
-    loadData();
+    loadSummary();
   }, []);
-
-  const handleSaveGstOnDashboard = async (e) => {
-    e.preventDefault();
-    setIsSavingGst(true);
-    setGstSaveSuccess(false);
-    try {
-      const val = Number(defaultGstRate) || 0;
-      await updateSettings({ defaultGstPercent: val });
-      setGstSaveSuccess(true);
-      setTimeout(() => setGstSaveSuccess(false), 3000);
-    } catch (err) {
-      console.error('Failed to update GST rate from dashboard:', err);
-    } finally {
-      setIsSavingGst(false);
-    }
-  };
 
   return (
     <div className="relative min-h-screen p-6 md:p-8 overflow-hidden bg-background">
@@ -108,61 +77,6 @@ export function Dashboard() {
             </Button>
           </div>
         </div>
-
-        {/* Admin Default GST Setting Banner Card */}
-        <Card className="p-5 bg-gradient-to-r from-teal-500/10 via-emerald-500/5 to-teal-500/10 border-2 border-teal-500/30">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-md">
-                <Percent className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-heading font-bold text-primary flex items-center gap-2">
-                  <span>Default Billing GST Rate (%)</span>
-                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-teal-100 text-teal-800 border border-teal-300">
-                    Auto-Fills in Billing
-                  </span>
-                </h3>
-                <p className="text-xs text-muted mt-0.5">
-                  Set default GST % rate (e.g. 10, 12, 5, 0, 18). Whatever number set here auto-fills on sales billing.
-                </p>
-              </div>
-            </div>
-
-            <form onSubmit={handleSaveGstOnDashboard} className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-              <div className="relative w-28">
-                <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  placeholder="0"
-                  value={defaultGstRate}
-                  onChange={(e) => setDefaultGstRate(e.target.value)}
-                  className="text-sm font-mono font-bold text-center border-teal-300 focus:border-teal-600 bg-white"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-teal-700">%</span>
-              </div>
-
-              <Button
-                type="submit"
-                variant="default"
-                size="sm"
-                disabled={isSavingGst}
-                className="gap-1.5 text-xs bg-teal-600 hover:bg-teal-700 text-white shadow-sm"
-              >
-                {gstSaveSuccess ? (
-                  <>
-                    <Check className="w-4 h-4 text-emerald-300" />
-                    <span>Saved!</span>
-                  </>
-                ) : (
-                  <span>Save GST</span>
-                )}
-              </Button>
-            </form>
-          </div>
-        </Card>
 
         {/* Real-Time Summary Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
