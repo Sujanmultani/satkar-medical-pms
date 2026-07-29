@@ -160,6 +160,7 @@ export function StockTable({ storeType = 'medical' }) {
   // Helper calculations per item
   const getItemSummary = (item) => {
     const batches = item.batches || [];
+    const totalQty = batches.reduce((acc, b) => acc + (b.qty || 0), 0);
     const masterTotalQty = batches.reduce((acc, b) => acc + (b.qty || 0), 0);
     
     // Find nearest expiry batch
