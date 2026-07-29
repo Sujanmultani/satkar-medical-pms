@@ -55,13 +55,14 @@ const authRateLimiter = createRateLimiter({
   message: 'Too many login attempts detected from your device.',
 });
 
-const apiRateLimiter = createRateLimiter({
+const scanRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 600, // max 600 requests per 15 minutes per IP
-  message: 'Too many requests sent to server.',
+  max: 30, // max 30 invoice scans per 15 minutes per IP
+  message: 'Too many invoice scans requested. Please wait a few minutes before scanning more bills.',
 });
 
 module.exports = {
   authRateLimiter,
   apiRateLimiter,
+  scanRateLimiter,
 };

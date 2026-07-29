@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const { scanInvoice, confirmInvoice } = require('../controllers/invoiceController');
 const { protect } = require('../middleware/authMiddleware');
+const { scanRateLimiter } = require('../middleware/rateLimiter');
 
 // Multer memory storage configuration
 const upload = multer({
@@ -21,7 +22,7 @@ const upload = multer({
 
 router.use(protect);
 
-router.post('/scan', upload.single('image'), scanInvoice);
+router.post('/scan', scanRateLimiter, upload.single('image'), scanInvoice);
 router.post('/confirm', confirmInvoice);
 
 module.exports = router;
