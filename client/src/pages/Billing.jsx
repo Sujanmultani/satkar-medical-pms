@@ -317,34 +317,43 @@ export function Billing() {
                     className="pl-9 text-xs"
                   />
 
-                  {/* Dropdown Results */}
-                  {searchResults.length > 0 && (
-                    <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl max-h-60 overflow-y-auto">
-                      {searchResults.map((item) => {
-                        const totalQty = (item.batches || []).reduce((acc, b) => acc + (b.qty || 0), 0);
+                  {/* Dropdown Results - Only show items with available stock > 0 */}
+                  {(() => {
+                    const availableSearchResults = searchResults.filter((item) => {
+                      const totalQty = (item.batches || []).reduce((acc, b) => acc + (b.qty || 0), 0);
+                      return totalQty > 0;
+                    });
 
-                        return (
-                          <button
-                            key={item._id}
-                            onClick={() => handleSelectItem(item)}
-                            className="w-full text-left p-3 hover:bg-teal-50/60 border-b border-gray-100 last:border-0 flex items-center justify-between"
-                          >
-                            <div>
-                              <p className="text-xs font-bold text-primary">{item.name}</p>
-                              {item.composition && (
-                                <p className="text-[10px] text-muted">{item.composition}</p>
-                              )}
-                            </div>
-                            <div className="text-right">
-                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-gray-100">
-                                Stock: {totalQty}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+                    if (availableSearchResults.length === 0) return null;
+
+                    return (
+                      <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl max-h-60 overflow-y-auto">
+                        {availableSearchResults.map((item) => {
+                          const totalQty = (item.batches || []).reduce((acc, b) => acc + (b.qty || 0), 0);
+
+                          return (
+                            <button
+                              key={item._id}
+                              onClick={() => handleSelectItem(item)}
+                              className="w-full text-left p-3 hover:bg-teal-50/60 border-b border-gray-100 last:border-0 flex items-center justify-between transition-colors"
+                            >
+                              <div>
+                                <p className="text-xs font-bold text-primary">{item.name}</p>
+                                {item.composition && (
+                                  <p className="text-[10px] text-muted">{item.composition}</p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                  Stock: {totalQty}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Selected Item Batch & Add Bar */}
