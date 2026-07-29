@@ -54,9 +54,9 @@ export function Billing() {
     async function fetchStoreSettings() {
       try {
         const res = await getSettings();
-        const settingsData = res?.data || res || {};
-        if (settingsData.defaultGstPercent !== undefined && settingsData.defaultGstPercent !== null) {
-          const gstVal = Number(settingsData.defaultGstPercent);
+        const s = res?.data?.data || res?.data || res || {};
+        if (s.defaultGstPercent !== undefined && s.defaultGstPercent !== null) {
+          const gstVal = Number(s.defaultGstPercent);
           setDefaultGstRate(isNaN(gstVal) ? 0 : gstVal);
         }
       } catch (err) {
@@ -104,11 +104,30 @@ export function Billing() {
   };
 
   // Add Item to Bill Line Items
-  const handleAddLineItem = () => {
+  const handleAddLineItem = async () => {
     if (!selectedItem || !selectedBatchId) return;
 
     const batch = selectedItem.batches.find((b) => b.batchId === selectedBatchId || b._id === selectedBatchId);
     if (!batch) return;
+
+    let activeGstRate = defaultGstRate;
+    if (activeGstRate === 0) {
+      try {
+        const res = await getSettings();
+        const s = res?.data?.data || res?.data || res || {};
+        if (s.defaultGstPercent !== undefined && s.defaultGstPercent !== null) {
+          const parsed = Number(s.defaultGstPercent);
+          if (!isNaN(parsed) && parsed > 0) {
+            activeGstRate = parsed;
+            setDefaultGstRate(parsed);
+          }
+        }
+      } catch (e) {
+        // fallback
+      }
+    }
+
+    const initialGst = activeGstRate > 0 ? activeGstRate : (batch.gstPercent || 0);
 
     // Check if item+batch already added
     const existingIndex = lineItems.findIndex((l) => l.batch._id === batch._id);
@@ -122,10 +141,6 @@ export function Billing() {
       updated[existingIndex].qty = newQty;
       setLineItems(updated);
     } else {
-      const initialGst = defaultGstRate > 0
-        ? defaultGstRate
-        : (batch.gstPercent || 0);
-
       setLineItems([
         ...lineItems,
         {
