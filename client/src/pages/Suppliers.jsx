@@ -255,12 +255,14 @@ export function Suppliers() {
                             const bId = ret.batchId?._id ? ret.batchId._id.toString() : ret.batchId ? ret.batchId.toString() : null;
                             const targetId = batch._id ? batch._id.toString() : null;
                             const matchId = bId && targetId && bId === targetId;
-                            const matchBatchNo = ret.batchNo && batch.batchNo && ret.batchNo.trim().toLowerCase() === batch.batchNo.trim().toLowerCase();
-                            const matchItemName = ret.itemName && item.name && ret.itemName.trim().toLowerCase() === item.name.trim().toLowerCase();
-                            return matchId || matchBatchNo || matchItemName;
+                            const rBatchNo = ret.batchNo || ret.batchId?.batchNo;
+                            const matchBatchNo = rBatchNo && batch.batchNo && rBatchNo.trim().toLowerCase() === batch.batchNo.trim().toLowerCase();
+                            return matchId || matchBatchNo;
                           });
-                          const returnedQty = batch.returnedQty !== undefined && batch.returnedQty > 0 ? batch.returnedQty : batchReturns.reduce((acc, r) => acc + (r.qty || 0), 0);
-                          const isReturned = batch.isReturned || returnedQty > 0;
+                          const returnedQty = (batch.returnedQty !== undefined && batch.returnedQty > 0)
+                            ? batch.returnedQty
+                            : batchReturns.reduce((acc, r) => acc + (r.quantity || r.qty || 0), 0);
+                          const isReturned = returnedQty > 0;
 
                           return (
                             <TableRow key={batch._id} className={isPaid ? 'bg-emerald-50/20' : 'bg-amber-50/20'}>

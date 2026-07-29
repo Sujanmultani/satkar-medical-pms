@@ -143,9 +143,9 @@ const getSupplierById = async (req, res, next) => {
         (r) =>
           (r.batchId && r.batchId._id ? r.batchId._id.toString() : r.batchId ? r.batchId.toString() : null) === b._id.toString() ||
           (r.batchNo && b.batchNo && r.batchNo.trim().toLowerCase() === b.batchNo.trim().toLowerCase()) ||
-          (r.itemName && b.itemId && b.itemId.name && r.itemName.trim().toLowerCase() === b.itemId.name.trim().toLowerCase())
+          (r.batchId && r.batchId.batchNo && b.batchNo && r.batchId.batchNo.trim().toLowerCase() === b.batchNo.trim().toLowerCase())
       );
-      const returnedQty = batchReturns.reduce((sum, r) => sum + (r.qty || 0), 0);
+      const returnedQty = batchReturns.reduce((sum, r) => sum + (r.quantity || r.qty || 0), 0);
 
       return {
         ...b,
