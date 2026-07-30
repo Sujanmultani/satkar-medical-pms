@@ -9,6 +9,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      devOptions: {
+        enabled: true,
+      },
       includeAssets: ['satkar-logo.jpeg', 'apple-touch-icon.png', 'favicon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'maskable-icon-512x512.png'],
       manifest: {
         name: 'Satkar Medical — Pharmacy Management System',
@@ -40,6 +43,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpeg}'],
+        suppressWarnings: true,
         runtimeCaching: [
           {
             urlPattern: /^https?:\/\/.*\/api\/.*/i,

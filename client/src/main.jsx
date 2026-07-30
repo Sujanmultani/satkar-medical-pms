@@ -3,6 +3,14 @@ import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import './index.css';
 import logoAsset from '@/assets/satkar-logo.jpeg';
+import { registerSW } from 'virtual:pwa-register';
+
+// Register PWA Service Worker
+try {
+  registerSW({ immediate: true });
+} catch (err) {
+  console.log('[PWA] Service worker registration notice:', err);
+}
 
 // Set Satkar Medical official logo as browser tab favicon
 try {
