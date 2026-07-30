@@ -16,15 +16,14 @@ if (fs.existsSync(srcLogo)) {
 
   try {
     const sharp = require('sharp');
-    const generateIcons = async () => {
+    (async () => {
       await sharp(srcLogo).resize(192, 192, { fit: 'contain', background: { r: 250, g: 247, b: 242, alpha: 1 } }).png().toFile(path.join(publicDir, 'pwa-192x192.png'));
       await sharp(srcLogo).resize(512, 512, { fit: 'contain', background: { r: 250, g: 247, b: 242, alpha: 1 } }).png().toFile(path.join(publicDir, 'pwa-512x512.png'));
       await sharp(srcLogo).resize(512, 512, { fit: 'cover' }).png().toFile(path.join(publicDir, 'maskable-icon-512x512.png'));
       await sharp(srcLogo).resize(180, 180, { fit: 'contain', background: { r: 250, g: 247, b: 242, alpha: 1 } }).png().toFile(path.join(publicDir, 'apple-touch-icon.png'));
       await sharp(srcLogo).resize(64, 64, { fit: 'contain', background: { r: 250, g: 247, b: 242, alpha: 1 } }).png().toFile(path.join(publicDir, 'favicon.png'));
       console.log('[Satkar Assets] PWA Icons (192x192, 512x512, maskable, apple-touch) generated cleanly with sharp!');
-    };
-    generateIcons();
+    })();
   } catch (err) {
     console.warn('[Satkar Assets] Sharp processing notice:', err.message);
   }
