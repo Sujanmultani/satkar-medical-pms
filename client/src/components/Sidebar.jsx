@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -15,11 +16,232 @@ import {
   Menu,
   X,
   Undo2,
-  Building2
+  Building2,
+  Download,
+  Monitor,
+  Smartphone,
+  Apple,
+  Sparkles
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import logoAsset from '@/assets/satkar-logo.jpeg';
 import { LogoWatermark } from './LogoWatermark';
+import { Button } from '@/components/ui/Button';
+
+function InstallAppModal({ isOpen, onClose, deferredPrompt, onDirectInstall }) {
+  const [activeTab, setActiveTab] = useState('pc');
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+      <div className="relative w-full max-w-md bg-surface p-6 rounded-2xl border border-primary/20 shadow-2xl space-y-5">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-muted hover:text-primary p-1 rounded-lg hover:bg-black/5"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-primary/10 p-1.5 flex items-center justify-center border border-primary/20 shrink-0">
+            <img src={logoAsset} alt="Satkar Logo" className="w-full h-full object-contain" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold font-heading text-primary flex items-center gap-2">
+              <span>Install Satkar Medical App</span>
+              <Sparkles className="w-4 h-4 text-amber-500" />
+            </h3>
+            <p className="text-xs text-muted">Install on your PC or Phone as a standalone app shortcut.</p>
+          </div>
+        </div>
+
+        {deferredPrompt && (
+          <Button
+            onClick={onDirectInstall}
+            variant="default"
+            size="md"
+            className="w-full gap-2 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 shadow-md"
+          >
+            <Download className="w-4 h-4 animate-bounce" />
+            <span>Click Here to Install Directly Now</span>
+          </Button>
+        )}
+
+        {/* Tab Buttons */}
+        <div className="flex bg-background p-1 rounded-xl border border-primary/10">
+          <button
+            onClick={() => setActiveTab('pc')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all ${
+              activeTab === 'pc' ? 'bg-primary text-white shadow-sm' : 'text-muted hover:text-primary'
+            }`}
+          >
+            <Monitor className="w-3.5 h-3.5" />
+            <span>PC / Laptop</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('android')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all ${
+              activeTab === 'android' ? 'bg-primary text-white shadow-sm' : 'text-muted hover:text-primary'
+            }`}
+          >
+            <Smartphone className="w-3.5 h-3.5" />
+            <span>Android</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('ios')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all ${
+              activeTab === 'ios' ? 'bg-primary text-white shadow-sm' : 'text-muted hover:text-primary'
+            }`}
+          >
+            <Apple className="w-3.5 h-3.5" />
+            <span>iPhone / iOS</span>
+          </button>
+        </div>
+
+        {/* Tab Content */}
+        <div className="bg-background p-4 rounded-xl border border-primary/10 text-xs space-y-3">
+          {activeTab === 'pc' && (
+            <div className="space-y-2 text-primary">
+              <p className="font-bold flex items-center gap-2 text-teal-700">
+                <Monitor className="w-4 h-4 text-teal-600" />
+                <span>Google Chrome & Microsoft Edge (PC)</span>
+              </p>
+              <ol className="list-decimal list-inside space-y-1.5 text-muted leading-relaxed">
+                <li>Look at Chrome top-right menu <strong>(⋮)</strong> or address bar.</li>
+                <li>Click 3 dots menu ➔ <strong>"Cast, save, and share"</strong> ➔ <strong>"Install Satkar Medical..."</strong>.</li>
+                <li>Or click the 🖥️ computer icon on the right side of URL bar.</li>
+              </ol>
+            </div>
+          )}
+
+          {activeTab === 'android' && (
+            <div className="space-y-2 text-primary">
+              <p className="font-bold flex items-center gap-2 text-teal-700">
+                <Smartphone className="w-4 h-4 text-teal-600" />
+                <span>Android Chrome Browser</span>
+              </p>
+              <ol className="list-decimal list-inside space-y-1.5 text-muted leading-relaxed">
+                <li>Open Chrome menu <strong>(⋮)</strong> in top right.</li>
+                <li>Tap <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong>.</li>
+                <li>Satkar Medical icon will be created on your phone home screen!</li>
+              </ol>
+            </div>
+          )}
+
+          {activeTab === 'ios' && (
+            <div className="space-y-2 text-primary">
+              <p className="font-bold flex items-center gap-2 text-teal-700">
+                <Apple className="w-4 h-4 text-teal-600" />
+                <span>iPhone / iPad Safari Browser</span>
+              </p>
+              <ol className="list-decimal list-inside space-y-1.5 text-muted leading-relaxed">
+                <li>Open Safari and tap bottom <strong>Share button (⬆️)</strong>.</li>
+                <li>Scroll down and tap <strong>"Add to Home Screen"</strong>.</li>
+                <li>Tap <strong>"Add"</strong> in top right corner.</li>
+              </ol>
+            </div>
+          )}
+        </div>
+
+        <Button
+          onClick={onClose}
+          variant="outline"
+          size="sm"
+          className="w-full text-xs font-semibold"
+        >
+          Close
+        </Button>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function InstallAppButton() {
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  React.useEffect(() => {
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+      setIsInstalled(true);
+    }
+
+    const handlePrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    const handleInstalled = () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handlePrompt);
+    window.addEventListener('appinstalled', handleInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handlePrompt);
+      window.removeEventListener('appinstalled', handleInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setIsInstalled(true);
+      }
+      setDeferredPrompt(null);
+    } else {
+      setIsModalOpen(true);
+    }
+  };
+
+  const handleDirectInstall = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setIsInstalled(true);
+      }
+      setDeferredPrompt(null);
+    }
+    setIsModalOpen(false);
+  };
+
+  if (isInstalled) {
+    return (
+      <div className="flex items-center justify-center gap-2 px-3 py-1.5 mb-3 rounded-lg bg-emerald-500/20 text-emerald-300 text-[11px] font-medium border border-emerald-500/30">
+        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+        <span>App Installed ✓</span>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <button
+        onClick={handleInstallClick}
+        className="w-full flex items-center justify-center gap-2 py-2 px-3 mb-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer border border-emerald-400/40"
+      >
+        <Download className="w-3.5 h-3.5 text-white animate-bounce shrink-0" />
+        <span>Install App (PC & Mobile)</span>
+      </button>
+
+      <InstallAppModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        deferredPrompt={deferredPrompt}
+        onDirectInstall={handleDirectInstall}
+      />
+    </>
+  );
+}
 
 export function Sidebar() {
   const { user, logout } = useAuthStore();
@@ -132,6 +354,8 @@ export function Sidebar() {
             </div>
           </div>
         </div>
+
+        <InstallAppButton />
 
         <button
           onClick={handleLogout}
