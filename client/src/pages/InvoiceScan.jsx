@@ -759,7 +759,3 @@ export function InvoiceScan() {
 }
 
 export default InvoiceScan;
-  );
-}
-
-export default InvoiceScan;
