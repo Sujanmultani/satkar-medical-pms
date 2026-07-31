@@ -18,7 +18,12 @@ async function run() {
     console.log('[Satkar Assets] Copied satkar-logo.jpeg to client/src/assets/ & client/public/');
 
     try {
-      const sharp = require('sharp');
+      let sharp;
+      try {
+        sharp = require('sharp');
+      } catch (e) {
+        sharp = require(path.join(__dirname, 'client', 'node_modules', 'sharp'));
+      }
       const bgTeal = { r: 11, g: 76, b: 82, alpha: 1 };
       const bgCream = { r: 250, g: 247, b: 242, alpha: 1 };
 

@@ -1,6 +1,12 @@
-const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
+
+let sharp;
+try {
+  sharp = require('sharp');
+} catch (e) {
+  sharp = require(path.join(__dirname, '../node_modules/sharp'));
+}
 
 const rootDir = path.join(__dirname, '..', '..');
 const SOURCE_ROOT = path.join(rootDir, 'logo.jpeg');
