@@ -5,10 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "predev": "node ../copy_assets.js",
     "generate-icons": "node scripts/generate-icons.js",
     "build": "vite build",
-    "prebuild": "node ../copy_assets.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },
