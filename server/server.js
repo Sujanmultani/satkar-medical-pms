@@ -20,14 +20,23 @@ const supplierRoutes = require('./routes/supplierRoutes.js');
 const adminRoutes = require('./routes/adminRoutes.js');
 const { startExpiryCron } = require('./jobs/expiryStatusJob.js');
 const { startQuarterlyBackupCron } = require('./jobs/quarterlyBackupJob.js');
+const { verifyEmailTransporter } = require('./services/emailService.js');
 const { errorHandler, notFound } = require('./middleware/errorMiddleware.js');
 
 dotenv.config();
+
+console.log('========================================');
+console.log('EMAIL CONFIG CHECK:');
+console.log('EMAIL_USER:', (process.env.EMAIL_USER || process.env.GMAIL_USER) ? 'SET' : 'MISSING');
+console.log('EMAIL_PASS:', (process.env.EMAIL_PASS || process.env.EMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASSWORD) ? 'SET' : 'MISSING');
+console.log('ADMIN_NOTIFICATION_EMAIL:', process.env.ADMIN_NOTIFICATION_EMAIL || '(using fallback default)');
+console.log('========================================');
 
 // Connect to MongoDB & start background jobs
 connectDB().then(() => {
   startExpiryCron();
   startQuarterlyBackupCron();
+  verifyEmailTransporter();
 });
 
 const app = express();

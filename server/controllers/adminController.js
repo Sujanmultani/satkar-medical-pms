@@ -10,11 +10,14 @@ const triggerManualBackup = async (req, res, next) => {
     if (!result.success) {
       return res.status(500).json({
         error: { code: 'BACKUP_FAILED', message: result.error || 'Failed to generate database backup.' },
+        emailStatus: result.emailResult || null,
+        data: result,
       });
     }
 
     return res.status(200).json({
       message: 'Database backup successfully generated and processed.',
+      emailStatus: result.emailResult || null,
       data: result,
     });
   } catch (error) {
@@ -30,6 +33,7 @@ const triggerManualExpiryEmail = async (req, res, next) => {
     const result = await updateBatchExpiryStatuses(true);
     return res.status(200).json({
       message: 'Expiry status check and email digest completed.',
+      emailStatus: result.emailResult || null,
       data: result,
     });
   } catch (error) {

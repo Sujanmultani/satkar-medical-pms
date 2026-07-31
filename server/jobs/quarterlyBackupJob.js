@@ -13,7 +13,7 @@ const { sendBackupEmail } = require('../services/emailService');
  * Performs database export of all business collections to Excel workbook (.xlsx) and sends backup email.
  */
 const runQuarterlyBackup = async () => {
-  console.log('[Quarterly Backup Job] Starting automated Excel database export...');
+  console.log('[Monthly Backup Job] Starting automated Excel database export...');
   try {
     const exportDate = new Date().toISOString();
 
@@ -201,7 +201,7 @@ const runQuarterlyBackup = async () => {
 
     const excelBuffer = await workbook.xlsx.writeBuffer();
 
-    console.log(`[Quarterly Backup Job] Excel workbook generated: ${excelBuffer.length} bytes across 7 sheets.`);
+    console.log(`[Monthly Backup Job] Excel workbook generated: ${excelBuffer.length} bytes across 7 sheets.`);
 
     const emailResult = await sendBackupEmail(Buffer.from(excelBuffer), exportDate, counts, 'xlsx');
 

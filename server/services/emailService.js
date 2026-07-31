@@ -63,11 +63,11 @@ const sendBackupEmail = async (fileBuffer, exportDateISO, counts = {}, fileType 
     const mailOptions = {
       from: `"Satkar Medical System" <${user}>`,
       to: recipient,
-      subject: `Satkar Medical — Quarterly Data Backup (${dateFormatted})`,
+      subject: `Satkar Medical — Monthly Data Backup (${dateFormatted})`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
           <h2 style="color: #0B4C52; margin-top: 0;">Satkar Medical Pharmacy System</h2>
-          <h3 style="color: #17878E;">Automated Quarterly Data Backup</h3>
+          <h3 style="color: #17878E;">Automated Monthly Data Backup</h3>
           <p>Hello Admin,</p>
           <p>Please find attached the automated database export Excel workbook for Satkar Medical PMS generated on <strong>${dateFormatted}</strong>.</p>
           
@@ -377,6 +377,27 @@ const sendPasswordResetOtpEmail = async ({ userEmail, userName, otp }) => {
   } catch (error) {
     console.error('[Password Reset Email Error] Failed to send OTP:', error.message);
     return { success: false, error: error.message };
+/**
+ * Verifies SMTP transporter connection on server startup.
+ */
+const verifyEmailTransporter = async () => {
+  try {
+    dotenv.config();
+    const user = process.env.EMAIL_USER || process.env.GMAIL_USER;
+    const pass = process.env.EMAIL_PASS || process.env.EMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASSWORD;
+
+    if (!user || !pass) {
+      console.warn('[EmailService] Transporter verification skipped - missing EMAIL_USER or EMAIL_PASS in environment.');
+      return { success: false, skipped: true, message: 'Missing EMAIL_USER or EMAIL_PASS credentials.' };
+    }
+
+    const transporter = createTransporter();
+    await transporter.verify();
+    console.log('[EmailService] SMTP Transporter connection verified successfully!');
+    return { success: true, message: 'SMTP connection verified successfully.' };
+  } catch (error) {
+    console.error('[EmailService] SMTP Transporter verification failed:', error.message);
+    return { success: false, error: error.message };
   }
 };
 
@@ -385,4 +406,5 @@ module.exports = {
   sendExpiryDigestEmail,
   sendNewLoginSecurityAlert,
   sendPasswordResetOtpEmail,
+  verifyEmailTransporter,
 };
