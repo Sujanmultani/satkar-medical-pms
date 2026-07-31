@@ -256,6 +256,9 @@ export function InvoiceScan() {
   const totalCgstAmount = roundMoney(totalGstAmount / 2);
   const totalSgstAmount = roundMoney(totalGstAmount - totalCgstAmount);
   const totalCalculatedAmount = roundMoney(baseCalculatedAmount + totalGstAmount);
+  const mismatchAmount =
+    printedGrandTotal !== null ? roundMoney(totalCalculatedAmount - printedGrandTotal) : 0;
+  const hasSignificantMismatch = Math.abs(mismatchAmount) > 1;
 
   return (
     <div className="relative min-h-screen p-6 md:p-8 bg-background">
@@ -669,6 +672,17 @@ export function InvoiceScan() {
                       {printedGrandTotal !== null && <span>• Printed Net Total: <strong className="font-bold text-teal-900">₹{printedGrandTotal.toFixed(2)}</strong></span>}
                     </div>
                   )}
+
+                  {hasSignificantMismatch && (
+                    <div className="flex items-center gap-2 text-[11px] text-red-800 bg-red-50 px-2.5 py-1 rounded-md border border-red-200">
+                      <span className="font-semibold uppercase tracking-wider">⚠ Mismatch:</span>
+                      <span>
+                        Calculated total differs from printed invoice total by{' '}
+                        <strong className="font-bold">₹{Math.abs(mismatchAmount).toFixed(2)}</strong>.
+                        Please recheck quantities, rates, or GST% before confirming.
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Confirm Button */}
@@ -741,6 +755,10 @@ export function InvoiceScan() {
         )}
       </div>
     </div>
+  );
+}
+
+export default InvoiceScan;
   );
 }
 

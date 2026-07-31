@@ -50,6 +50,14 @@ const invoiceSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    calculatedAmount: {
+      type: Number,
+      default: null,
+    },
+    amountMismatch: {
+      type: Number,
+      default: null,
+    },
     status: {
       type: String,
       enum: ['scanned', 'confirmed'],

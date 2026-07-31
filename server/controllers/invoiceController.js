@@ -217,7 +217,23 @@ const confirmInvoice = async (req, res, next) => {
 
     const totalCgst = roundMoney(totalInvoiceGst / 2);
     const totalSgst = roundMoney(totalInvoiceGst - totalCgst);
-    const totalAmount = roundMoney(totalBaseAmount + totalInvoiceGst);
+    const calculatedAmount = roundMoney(totalBaseAmount + totalInvoiceGst);
+
+    const validPrintedGrandTotal =
+      typeof printedGrandTotal === 'number' && !isNaN(printedGrandTotal) && printedGrandTotal > 0
+        ? roundMoney(printedGrandTotal)
+        : null;
+
+    const validRoundOff =
+      typeof printedRoundOff === 'number' && !isNaN(printedRoundOff) ? printedRoundOff : 0;
+
+    // Ground truth: use the actual printed total on the invoice whenever OCR read it.
+    // Only fall back to the internally computed sum if the printed total wasn't captured.
+    const totalAmount = validPrintedGrandTotal !== null
+      ? validPrintedGrandTotal
+      : roundMoney(calculatedAmount + validRoundOff);
+
+    const amountMismatch = roundMoney(totalAmount - calculatedAmount);
 
     // Save Invoice Record
     const invoiceRecord = await Invoice.create({
@@ -226,6 +242,8 @@ const confirmInvoice = async (req, res, next) => {
       invoiceDate: invoiceDate ? new Date(invoiceDate) : new Date(),
       items: invoiceItemsPayload,
       totalAmount,
+      calculatedAmount,
+      amountMismatch,
       printedSubtotal: typeof printedSubtotal === 'number' ? printedSubtotal : null,
       printedRoundOff: typeof printedRoundOff === 'number' ? printedRoundOff : null,
       printedGrandTotal: typeof printedGrandTotal === 'number' ? printedGrandTotal : null,
