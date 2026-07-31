@@ -377,6 +377,9 @@ const sendPasswordResetOtpEmail = async ({ userEmail, userName, otp }) => {
   } catch (error) {
     console.error('[Password Reset Email Error] Failed to send OTP:', error.message);
     return { success: false, error: error.message };
+  }
+};
+
 /**
  * Verifies SMTP transporter connection on server startup.
  */
