@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
-import { getSettings, updateSettings } from '@/services/settingsService';
+import { getSettings, updateSettings, clearAllDataApi } from '@/services/settingsService';
 import { changePassword } from '@/services/authService';
 import { LogoWatermark } from '@/components/LogoWatermark';
 import { Card } from '@/components/ui/Card';
@@ -16,7 +16,9 @@ import {
   Save,
   Lock,
   ShieldCheck,
-  FileText
+  FileText,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 
 export function Settings() {
@@ -42,6 +44,28 @@ export function Settings() {
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [passwordError, setPasswordError] = useState('');
+
+  // Data Wipe State
+  const [wipingData, setWipingData] = useState(false);
+  const [wipeSuccess, setWipeSuccess] = useState('');
+  const [wipeError, setWipeError] = useState('');
+  const [showWipeModal, setShowWipeModal] = useState(false);
+
+  const handleWipeAllData = async () => {
+    setWipingData(true);
+    setWipeSuccess('');
+    setWipeError('');
+    try {
+      await clearAllDataApi();
+      setWipeSuccess('All store data (Items, Batches, Invoices, Sales Bills, Suppliers) wiped cleanly & successfully!');
+      setShowWipeModal(false);
+    } catch (err) {
+      console.error('Failed to wipe data:', err);
+      setWipeError(err.response?.data?.error?.message || 'Failed to clear store data.');
+    } finally {
+      setWipingData(false);
+    }
+  };
 
   // Load Settings
   useEffect(() => {
@@ -435,6 +459,87 @@ export function Settings() {
                 </form>
               )}
             </Card>
+
+            {/* Danger Zone: Clear Store Data */}
+            <Card className="p-6 border-red-200 bg-red-50/20">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-red-100 text-red-700">
+                    <Trash2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-red-900">Reset Store Database</h3>
+                    <p className="text-xs text-red-700 mt-0.5">
+                      Wipe all items, stock batches, invoices, bills, and suppliers cleanly from MongoDB Atlas. Admin login & business settings will be preserved.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowWipeModal(true)}
+                  className="bg-white text-red-700 border-red-300 hover:bg-red-600 hover:text-white gap-2 font-bold shrink-0"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Wipe All Data</span>
+                </Button>
+              </div>
+
+              {wipeSuccess && (
+                <div className="mt-4 p-3 rounded-lg bg-green-50 text-green-800 border border-green-200 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-green-600" />
+                  <span>{wipeSuccess}</span>
+                </div>
+              )}
+
+              {wipeError && (
+                <div className="mt-4 p-3 rounded-lg bg-red-50 text-red-800 border border-red-200 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                  <span>{wipeError}</span>
+                </div>
+              )}
+            </Card>
+
+            {/* Wipe Confirmation Modal */}
+            {showWipeModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl border border-gray-200">
+                  <div className="flex items-center gap-3 text-red-700">
+                    <div className="p-3 bg-red-100 rounded-xl">
+                      <AlertTriangle className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-bold text-gray-900">Confirm Data Wipe</h4>
+                      <p className="text-xs text-muted">This action is permanent and cannot be undone.</p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    Are you sure you want to delete all <strong className="text-red-700">Items, Batches, Invoices, Sales Bills, and Suppliers</strong> from website database?
+                  </p>
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowWipeModal(false)}
+                      disabled={wipingData}
+                    >
+                      Cancel
+                    </Button>
+
+                    <Button
+                      type="button"
+                      onClick={handleWipeAllData}
+                      disabled={wipingData}
+                      className="bg-red-600 hover:bg-red-700 text-white gap-2 font-bold"
+                    >
+                      {wipingData ? 'Wiping Data...' : 'Yes, Delete Everything'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
