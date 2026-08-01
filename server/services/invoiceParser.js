@@ -269,7 +269,44 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
   }
 };
 
+let sharp;
+try {
+  sharp = require('sharp');
+} catch (e) {
+  sharp = null;
+}
+
+/**
+ * Preprocesses invoice image using sharp before Gemini OCR extraction.
+ * Corrects EXIF orientation, resizes to max 2000x2000, and normalizes to high quality JPEG.
+ * Skips PDFs and gracefully falls back to original buffer if sharp fails or is missing.
+ */
+async function preprocessInvoiceImage(buffer, mimeType) {
+  if (!buffer || mimeType === 'application/pdf') {
+    return { buffer, mimeType };
+  }
+
+  if (!sharp) {
+    console.warn('[Invoice Preprocess] sharp module not available, using raw buffer');
+    return { buffer, mimeType };
+  }
+
+  try {
+    const processedBuffer = await sharp(buffer)
+      .rotate() // auto-orient using EXIF, then strip EXIF orientation tag
+      .resize({ width: 2000, height: 2000, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    return { buffer: processedBuffer, mimeType: 'image/jpeg' };
+  } catch (err) {
+    console.warn('[Invoice Preprocess] Failed to preprocess image, falling back to original buffer:', err.message);
+    return { buffer, mimeType }; // graceful fallback — never block scan feature
+  }
+}
+
 module.exports = {
   parseInvoiceImageWithGemini,
   parseExpiryDate,
+  preprocessInvoiceImage,
 };

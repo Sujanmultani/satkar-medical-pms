@@ -1,4 +1,4 @@
-const { parseInvoiceImageWithGemini } = require('../services/invoiceParser');
+const { parseInvoiceImageWithGemini, preprocessInvoiceImage } = require('../services/invoiceParser');
 const { findOrCreateSupplier } = require('../services/supplierService');
 const Item = require('../models/Item');
 const Batch = require('../models/Batch');
@@ -17,8 +17,14 @@ const scanInvoice = async (req, res, next) => {
       });
     }
 
+    // Preprocess image with sharp (EXIF auto-orientation, max 2000x2000 resize, JPEG quality 90)
+    const { buffer: processedBuffer, mimeType: processedMimeType } = await preprocessInvoiceImage(
+      req.file.buffer,
+      req.file.mimetype
+    );
+
     // Call Gemini multimodal invoice parser
-    const parsedData = await parseInvoiceImageWithGemini(req.file.buffer, req.file.mimetype);
+    const parsedData = await parseInvoiceImageWithGemini(processedBuffer, processedMimeType);
 
     // Auto-fill composition from known items in database
     const targetStore = ['medical', 'provision'].includes(req.body.storeType) ? req.body.storeType : 'medical';
