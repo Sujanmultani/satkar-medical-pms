@@ -99,9 +99,11 @@ Analyze the attached invoice image and extract structured JSON data according to
      - expiryDate: Expiry date as YYYY-MM-DD (convert bare MM/YY or MM/YYYY to last day of month).
      - qty: Number of packs/units actually billed and purchased on this line (integer, default 1).
      - purchaseRate: Net effective purchase rate per unit POST-DISCOUNT (number).
+       * IMPORTANT DISCOUNT & RATE GUIDANCE: Indian pharma distributor invoices often show a discount or scheme percentage (labeled 'S+C%', 'Disc%', 'INDIS', 'Scheme%', or similar) that reduces the base amount used for GST calculation. When such a column exists, purchaseRate MUST reflect the rate AFTER this discount is applied, not the raw listed trade rate.
+       * ALWAYS ATTEMPT EXTRACTION OF printedLineTotal: If a printed line total (printedLineTotal / TOT.AMT / Line Amount) is visible and legible for a row, extract it. If raw trade rate vs post-discount rate is ambiguous, prioritize deriving purchaseRate by working backward from printedLineTotal: purchaseRate = (printedLineTotal / (1 + gstPercent/100)) / qty.
      - mrp: Maximum Retail Price per pack (number).
      - gstPercent: Read the EXACT GST/tax percentage printed for THIS SPECIFIC line item (number).
-     - printedLineTotal: Printed final line item amount figure if printed on this line (number or null).
+     - printedLineTotal: Printed final line item amount figure if printed on this line (number or null). ALWAYS ATTEMPT TO EXTRACT THIS FIELD FOR EVERY LINE ITEM.
      - confidence: "high" if legible; set to "low" if ambiguous.
 
 3. STRICT DUPLICATE PREVENTION & MERGING RULES:

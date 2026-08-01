@@ -103,7 +103,27 @@ export function InvoiceScan() {
       setPrintedGrandTotal(result.printedGrandTotal ?? null);
       setRawOcrText(result.rawText || '');
 
-      const parsedItems = result.items || [];
+      const parsedItems = (result.items || []).map((item) => {
+        const pTotal = typeof item.printedLineTotal === 'number' && !isNaN(item.printedLineTotal) && item.printedLineTotal > 0
+          ? item.printedLineTotal
+          : null;
+        const qty = Number(item.qty) || 1;
+        const gst = Number(item.gstPercent) || 0;
+
+        let derivedRate = Number(item.purchaseRate) || 0;
+        if (pTotal !== null && qty > 0) {
+          const lineBase = pTotal / (1 + gst / 100);
+          derivedRate = roundMoney(lineBase / qty);
+        }
+
+        return {
+          ...item,
+          printedLineTotal: pTotal,
+          purchaseRate: derivedRate,
+          isManuallyEdited: false,
+        };
+      });
+
       if (parsedItems.length === 0) {
         // Fallback row if no items parsed
         setItems([
@@ -158,7 +178,11 @@ export function InvoiceScan() {
 
     setItems((prev) => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: cleanValue };
+      updated[index] = {
+        ...updated[index],
+        [field]: cleanValue,
+        isManuallyEdited: true, // Mark row as manually edited by user
+      };
       return updated;
     });
   };
@@ -176,6 +200,7 @@ export function InvoiceScan() {
         mrp: 0,
         gstPercent: 0,
         confidence: 'high',
+        isManuallyEdited: true,
       },
     ]);
   };
@@ -209,6 +234,26 @@ export function InvoiceScan() {
       }
     }
 
+    // Ensure purchaseRate reflects post-discount effective rate before submitting to backend
+    const itemsPayload = items.map((item) => {
+      const isEdited = Boolean(item.isManuallyEdited);
+      const pTotal = typeof item.printedLineTotal === 'number' && !isNaN(item.printedLineTotal) && item.printedLineTotal > 0
+        ? item.printedLineTotal
+        : null;
+
+      let finalRate = Number(item.purchaseRate) || 0;
+      if (!isEdited && pTotal !== null && Number(item.qty) > 0) {
+        const gstPercent = Number(item.gstPercent) || 0;
+        const lineBase = pTotal / (1 + gstPercent / 100);
+        finalRate = roundMoney(lineBase / Number(item.qty));
+      }
+
+      return {
+        ...item,
+        purchaseRate: finalRate,
+      };
+    });
+
     setIsSubmitting(true);
     try {
       const res = await confirmInvoice({
@@ -220,7 +265,7 @@ export function InvoiceScan() {
         printedGrandTotal,
         storeType,
         paymentStatus,
-        items,
+        items: itemsPayload,
       });
 
       setSuccessData(res.data);
@@ -233,29 +278,51 @@ export function InvoiceScan() {
     }
   };
 
-  // Calculate totals (Base Amount + CGST + SGST = Total Calculated Amount)
+  // Calculate totals (trusting printedLineTotal per row when available and unedited)
+  const calculatedRowTotals = items.map((item) => {
+    const isEdited = Boolean(item.isManuallyEdited);
+    const pTotal = typeof item.printedLineTotal === 'number' && !isNaN(item.printedLineTotal) && item.printedLineTotal > 0
+      ? item.printedLineTotal
+      : null;
+
+    const qty = Number(item.qty) || 0;
+    const rate = Number(item.purchaseRate) || 0;
+    const discPercent = Number(item.discPercent) || 0;
+    const gstPercent = Number(item.gstPercent) || 0;
+
+    if (!isEdited && pTotal !== null) {
+      const lineBase = roundMoney(pTotal / (1 + gstPercent / 100));
+      const lineGst = roundMoney(pTotal - lineBase);
+      return {
+        lineBase,
+        lineGst,
+        lineTotal: pTotal,
+      };
+    }
+
+    const lineBase = roundMoney(qty * rate * (1 - discPercent / 100));
+    const lineGst = roundMoney((lineBase * gstPercent) / 100);
+    const lineTotal = roundMoney(lineBase + lineGst);
+    return {
+      lineBase,
+      lineGst,
+      lineTotal,
+    };
+  });
+
   const baseCalculatedAmount = roundMoney(
-    items.reduce((sum, item) => {
-      const qty = Number(item.qty) || 0;
-      const rate = Number(item.purchaseRate) || 0;
-      return sum + roundMoney(qty * rate);
-    }, 0)
+    calculatedRowTotals.reduce((sum, row) => sum + row.lineBase, 0)
   );
 
   const totalGstAmount = roundMoney(
-    items.reduce((sum, item) => {
-      const qty = Number(item.qty) || 0;
-      const rate = Number(item.purchaseRate) || 0;
-      const gstPercent = Number(item.gstPercent) || 0;
-      const lineBase = roundMoney(qty * rate);
-      const lineGst = roundMoney((lineBase * gstPercent) / 100);
-      return sum + lineGst;
-    }, 0)
+    calculatedRowTotals.reduce((sum, row) => sum + row.lineGst, 0)
   );
 
   const totalCgstAmount = roundMoney(totalGstAmount / 2);
   const totalSgstAmount = roundMoney(totalGstAmount - totalCgstAmount);
-  const totalCalculatedAmount = roundMoney(baseCalculatedAmount + totalGstAmount);
+  const totalCalculatedAmount = roundMoney(
+    calculatedRowTotals.reduce((sum, row) => sum + row.lineTotal, 0)
+  );
   const mismatchAmount =
     printedGrandTotal !== null ? roundMoney(totalCalculatedAmount - printedGrandTotal) : 0;
   const hasSignificantMismatch = Math.abs(mismatchAmount) > 1;
@@ -486,12 +553,9 @@ export function InvoiceScan() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {items.map((item, idx) => {
-                      const lineQty = Number(item.qty) || 0;
-                      const lineRate = Number(item.purchaseRate) || 0;
+                      const rowCalc = calculatedRowTotals[idx] || { lineTotal: 0 };
+                      const lineTotal = rowCalc.lineTotal;
                       const lineGstPercent = Number(item.gstPercent) || 0;
-                      const lineBase = roundMoney(lineQty * lineRate);
-                      const lineGst = roundMoney((lineBase * lineGstPercent) / 100);
-                      const lineTotal = roundMoney(lineBase + lineGst);
                       const halfGst = (lineGstPercent / 2).toFixed(1);
 
                       return (
