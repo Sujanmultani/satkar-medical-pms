@@ -657,6 +657,7 @@ export function StockTable({ storeType = 'medical' }) {
                                       <th className="py-2 px-3 text-center font-mono">Stock Qty</th>
                                     )}
                                     <th className="py-2 px-3 text-right">Purchase (₹)</th>
+                                    <th className="py-2 px-3 text-right">Disc %</th>
                                     <th className="py-2 px-3 text-right">MRP (₹)</th>
                                     <th className="py-2 px-3 text-center">GST %</th>
                                     <th className="py-2 px-3 text-center">Status</th>
@@ -697,6 +698,9 @@ export function StockTable({ storeType = 'medical' }) {
                                         <td className="py-2 px-3 text-center font-bold text-emerald-800 font-mono">{batch.qty}</td>
                                       )}
                                       <td className="py-2 px-3 text-right text-gray-600">₹{(batch.purchaseRate || 0).toFixed(2)}</td>
+                                      <td className="py-2 px-3 text-right text-gray-500">
+                                        {batch.discPercent && batch.discPercent > 0 ? `${batch.discPercent}%` : '—'}
+                                      </td>
                                       <td className="py-2 px-3 text-right font-medium text-gray-900">₹{(batch.mrp || 0).toFixed(2)}</td>
                                       <td className="py-2 px-3 text-center text-gray-500">{batch.gstPercent}%</td>
                                       <td className="py-2 px-3 text-center font-sans">

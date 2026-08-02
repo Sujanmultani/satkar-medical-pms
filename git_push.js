@@ -17,7 +17,7 @@ try {
   console.log('--- Running git commit ---');
   try {
     const commitOutput = execSync(
-      'git commit -m "feat: Phase 6.5 - Share Bill via WhatsApp public link and SharedBillView page"',
+      'git commit -m "feat: Save and Display Discount % on Batches (Batch model, invoiceController, StockTable, Suppliers)"',
       { encoding: 'utf8' }
     );
     console.log(commitOutput);

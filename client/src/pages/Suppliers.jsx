@@ -239,6 +239,7 @@ export function Suppliers() {
                           <TableHead className="font-mono">Expiry Date</TableHead>
                           <TableHead className="text-center font-mono">Stock Qty</TableHead>
                           <TableHead className="text-right font-mono">Purchase Rate</TableHead>
+                          <TableHead className="text-right font-mono">Disc %</TableHead>
                           <TableHead className="text-right font-mono">Amount Due (₹)</TableHead>
                           <TableHead className="text-center">Payment Status</TableHead>
                           <TableHead className="text-right">Action</TableHead>
@@ -302,6 +303,10 @@ export function Suppliers() {
                               </TableCell>
 
                               <TableCell className="text-right font-mono">₹{(batch.purchaseRate || 0).toFixed(2)}</TableCell>
+
+                              <TableCell className="text-right font-mono text-gray-500">
+                                {batch.discPercent && batch.discPercent > 0 ? `${batch.discPercent}%` : '—'}
+                              </TableCell>
 
                               <TableCell className="text-right font-mono font-bold text-gray-900">
                                 ₹{(batch.amountDue || (batch.qty * batch.purchaseRate) || 0).toFixed(2)}

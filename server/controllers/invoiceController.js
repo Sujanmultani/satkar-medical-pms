@@ -142,7 +142,7 @@ const confirmInvoice = async (req, res, next) => {
     const store = ['medical', 'provision'].includes(storeType) ? storeType : 'medical';
 
     for (const lineItem of items) {
-      const { name, composition, category, unit, hsnCode, location, batchNo, expiryDate, qty, freeQty, purchaseRate, mrp, gstPercent } = lineItem;
+      const { name, composition, category, unit, hsnCode, location, batchNo, expiryDate, qty, freeQty, purchaseRate, mrp, gstPercent, discPercent } = lineItem;
 
       if (!name || !name.trim()) continue;
       if (!batchNo || !batchNo.trim()) continue;
@@ -193,6 +193,7 @@ const confirmInvoice = async (req, res, next) => {
       const numPurchaseRate = Math.max(0, Number(purchaseRate) || 0);
       const numMrp = Math.max(0, Number(mrp) || 0);
       const numGstPercent = Math.max(0, Number(gstPercent) || 0);
+      const numDiscPercent = Math.max(0, Number(discPercent) || 0);
 
       const batchExpiry = expiryDate ? new Date(expiryDate) : null;
       const batchStatus = batchExpiry ? computeBatchStatus(batchExpiry) : 'active';
@@ -213,6 +214,7 @@ const confirmInvoice = async (req, res, next) => {
         purchaseRate: numPurchaseRate,
         mrp: numMrp,
         gstPercent: numGstPercent,
+        discPercent: numDiscPercent,
         status: batchStatus,
         paymentStatus: isPaid ? 'paid' : 'pending',
         amountDue: isPaid ? 0 : lineBase,
