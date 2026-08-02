@@ -17,7 +17,7 @@ try {
   console.log('--- Running git commit ---');
   try {
     const commitOutput = execSync(
-      'git commit -m "feat: Save and Display Discount % on Batches (Batch model, invoiceController, StockTable, Suppliers)"',
+      'git commit -m "fix: Show raw invoice-printed rate on Invoice Scan review screen instead of post-discount rate"',
       { encoding: 'utf8' }
     );
     console.log(commitOutput);

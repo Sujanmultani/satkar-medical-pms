@@ -133,19 +133,12 @@ export function InvoiceScan() {
         const pTotal = typeof item.printedLineTotal === 'number' && !isNaN(item.printedLineTotal) && item.printedLineTotal > 0
           ? item.printedLineTotal
           : null;
-        const qty = Number(item.qty) || 1;
-        const gst = Number(item.gstPercent) || 0;
-
-        let derivedRate = Number(item.purchaseRate) || 0;
-        if (pTotal !== null && qty > 0) {
-          const lineBase = pTotal / (1 + gst / 100);
-          derivedRate = roundMoney(lineBase / qty);
-        }
 
         return {
           ...item,
           printedLineTotal: pTotal,
-          purchaseRate: derivedRate,
+          purchaseRate: Number(item.purchaseRate) || 0,
+          discPercent: Number(item.discPercent) || 0,
           isManuallyEdited: false,
         };
       });
@@ -275,6 +268,9 @@ export function InvoiceScan() {
         const gstPercent = Number(item.gstPercent) || 0;
         const lineBase = pTotal / (1 + gstPercent / 100);
         finalRate = roundMoney(lineBase / Number(item.qty));
+      } else if (!isEdited && pTotal === null) {
+        const discPercent = Number(item.discPercent) || 0;
+        finalRate = roundMoney(finalRate * (1 - discPercent / 100));
       }
 
       return {

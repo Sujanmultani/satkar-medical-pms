@@ -99,9 +99,9 @@ Analyze the attached invoice image and extract structured JSON data according to
      - expiryDate: Expiry date as YYYY-MM-DD (convert bare MM/YY or MM/YYYY to last day of month).
      - qty: Number of packs/units actually billed and purchased on this line (integer, default 1).
      - freeQty: Some invoice lines include a separate 'Free Qty' / 'FQTY' / 'FR.QTY' / 'Free' / 'Scheme Qty' column, representing bonus units supplied at no additional cost, distinct from the billed/paid quantity (which stays in the existing 'qty' field). Extract this as 'freeQty' if present; default to 0 if the invoice has no such column for that line.
-     - purchaseRate: Net effective purchase rate per unit POST-DISCOUNT (number).
-       * IMPORTANT DISCOUNT & RATE GUIDANCE: Indian pharma distributor invoices often show a discount or scheme percentage (labeled 'S+C%', 'Disc%', 'INDIS', 'Scheme%', or similar) that reduces the base amount used for GST calculation. When such a column exists, purchaseRate MUST reflect the rate AFTER this discount is applied, not the raw listed trade rate.
-       * ALWAYS ATTEMPT EXTRACTION OF printedLineTotal: If a printed line total (printedLineTotal / TOT.AMT / Line Amount) is visible and legible for a row, extract it. If raw trade rate vs post-discount rate is ambiguous, prioritize deriving purchaseRate by working backward from printedLineTotal: purchaseRate = (printedLineTotal / (1 + gstPercent/100)) / qty.
+     - purchaseRate: The RAW rate per unit EXACTLY AS PRINTED in the invoice's own "Rate" column for this line — the number a human would read directly off the paper, BEFORE any discount or scheme deduction is applied. Do NOT apply any discount adjustment to this number yourself.
+     - discPercent: If the invoice shows a discount or scheme percentage column for this line (labeled 'S+C%', 'Disc%', 'INDIS', 'Scheme%', or similar), extract the exact printed percentage value (number). Default to 0 if no such column exists or is blank for this line.
+     - ALWAYS ATTEMPT EXTRACTION OF printedLineTotal: If a printed line total (printedLineTotal / TOT.AMT / Line Amount) is visible and legible for a row, extract it. This remains the primary source of truth for the line's total — it is independent of purchaseRate and discPercent above.
      - mrp: Maximum Retail Price per pack (number).
      - gstPercent: Read the EXACT GST/tax percentage printed for THIS SPECIFIC line item (number).
      - printedLineTotal: Printed final line item amount figure if printed on this line (number or null). ALWAYS ATTEMPT TO EXTRACT THIS FIELD FOR EVERY LINE ITEM.
@@ -131,6 +131,7 @@ OUTPUT JSON FORMAT (Strict JSON):
       "qty": 1,
       "freeQty": 0,
       "purchaseRate": 0.0,
+      "discPercent": 0.0,
       "mrp": 0.0,
       "gstPercent": null,
       "printedLineTotal": null,
@@ -186,6 +187,7 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
       const parsedQty = typeof item.qty === 'number' && !isNaN(item.qty) ? item.qty : parseInt(item.qty, 10);
       const parsedFreeQty = typeof item.freeQty === 'number' && !isNaN(item.freeQty) ? item.freeQty : parseInt(item.freeQty, 10);
       const parsedRate = typeof item.purchaseRate === 'number' && !isNaN(item.purchaseRate) ? item.purchaseRate : parseFloat(item.purchaseRate);
+      const parsedDiscPercent = typeof item.discPercent === 'number' && !isNaN(item.discPercent) ? item.discPercent : parseFloat(item.discPercent);
       const parsedMrp = typeof item.mrp === 'number' && !isNaN(item.mrp) ? item.mrp : parseFloat(item.mrp);
       const parsedGst = typeof item.gstPercent === 'number' && !isNaN(item.gstPercent) ? item.gstPercent : parseFloat(item.gstPercent);
       const parsedPrintedTotal = typeof item.printedLineTotal === 'number' && !isNaN(item.printedLineTotal) ? item.printedLineTotal : parseFloat(item.printedLineTotal);
@@ -212,6 +214,7 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
         qty: !isNaN(parsedQty) && parsedQty > 0 ? parsedQty : 1,
         freeQty: !isNaN(parsedFreeQty) && parsedFreeQty >= 0 ? parsedFreeQty : 0,
         purchaseRate: !isNaN(parsedRate) && parsedRate >= 0 ? parsedRate : 0,
+        discPercent: !isNaN(parsedDiscPercent) && parsedDiscPercent >= 0 ? parsedDiscPercent : 0,
         mrp: !isNaN(parsedMrp) && parsedMrp >= 0 ? parsedMrp : 0,
         gstPercent: hasValidGst ? parsedGst : null,
         printedLineTotal: !isNaN(parsedPrintedTotal) && parsedPrintedTotal > 0 ? parsedPrintedTotal : null,
