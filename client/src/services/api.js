@@ -1,11 +1,14 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/authStore';
 
-// Dynamically determine host IP for local network device access
+// Dynamically determine host IP for local network device access or production domain
 const getBaseUrl = () => {
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
   const hostname = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-  return `http://${hostname}:5000/api`;
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || /^192\.168\.\d+\.\d+$/.test(hostname) || /^10\.\d+\.\d+\.\d+$/.test(hostname)) {
+    return `http://${hostname}:5000/api`;
+  }
+  return 'https://api.satkarmedico.in/api';
 };
 
 const api = axios.create({

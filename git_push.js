@@ -17,7 +17,7 @@ try {
   console.log('--- Running git commit ---');
   try {
     const commitOutput = execSync(
-      'git commit -m "Add Delete Bill feature with stock restoration choice to Bill History"',
+      'git commit -m "Fix Vercel API proxy rewrite and fallback URL for DELETE /api/bills/:id"',
       { encoding: 'utf8' }
     );
     console.log(commitOutput);

@@ -38,6 +38,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://api.satkarmedico.in/api/:path*"
+    },
+    {
       "source": "/((?!pwa-192x192\\.png|pwa-512x512\\.png|maskable-icon-512x512\\.png|apple-touch-icon\\.png|favicon\\.png|satkar-logo\\.jpeg|manifest\\.webmanifest|robots\\.txt|screenshots/).*)",
       "destination": "/index.html"
     }
