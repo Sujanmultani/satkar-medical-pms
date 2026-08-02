@@ -17,7 +17,7 @@ try {
   console.log('--- Running git commit ---');
   try {
     const commitOutput = execSync(
-      'git commit -m "feat: Delete Invoice feature with optional stock rollback choice and partial rollback warnings"',
+      'git commit -m "style: Make Delete Invoice button solid red for prominent visibility"',
       { encoding: 'utf8' }
     );
     console.log(commitOutput);

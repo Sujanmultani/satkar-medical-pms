@@ -549,16 +549,15 @@ export function InvoiceScan() {
                     <div className="text-right sm:text-right col-span-2 sm:col-span-1">
                       <Button
                         type="button"
-                        variant="ghost"
                         size="sm"
                         onClick={() => {
                           setInvoiceToDelete(inv);
                           setIsDeleteInvoiceModalOpen(true);
                         }}
-                        className="h-8 px-2.5 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 gap-1.5 font-medium border border-red-200/60 rounded-lg"
+                        className="h-8 px-3 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold gap-1.5 rounded-lg shadow-sm border border-red-700"
                         title="Delete Invoice"
                       >
-                        <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                        <Trash2 className="w-3.5 h-3.5 text-white" />
                         <span>Delete Invoice</span>
                       </Button>
                     </div>
