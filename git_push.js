@@ -17,7 +17,7 @@ try {
   console.log('--- Running git commit ---');
   try {
     const commitOutput = execSync(
-      'git commit -m "fix: Improve Delete Invoice button placement with dedicated flex layout"',
+      'git commit -m "feat: Enable editing location on items, and freeQty, paymentStatus, amountDue on batches"',
       { encoding: 'utf8' }
     );
     console.log(commitOutput);

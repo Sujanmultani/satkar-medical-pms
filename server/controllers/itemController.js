@@ -225,7 +225,7 @@ const getItemById = async (req, res, next) => {
 // @access  Private
 const updateItem = async (req, res, next) => {
   try {
-    const { storeType, name, composition, category, unit, hsnCode } = req.body;
+    const { storeType, name, composition, category, unit, hsnCode, location } = req.body;
 
     const item = await Item.findById(req.params.id);
     if (!item) {
@@ -242,6 +242,7 @@ const updateItem = async (req, res, next) => {
     if (category !== undefined) item.category = category.trim();
     if (unit !== undefined) item.unit = unit.trim();
     if (hsnCode !== undefined) item.hsnCode = hsnCode.trim();
+    if (location !== undefined) item.location = typeof location === 'string' ? location.trim() : location;
 
     await item.save();
 

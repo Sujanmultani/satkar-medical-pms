@@ -113,7 +113,7 @@ const getBatches = async (req, res, next) => {
 // @access  Private
 const updateBatch = async (req, res, next) => {
   try {
-    const { batchNo, mfgDate, expiryDate, qty, purchaseRate, mrp, gstPercent, supplierName, supplierId, paymentStatus, amountDue } = req.body;
+    const { batchNo, mfgDate, expiryDate, qty, freeQty, purchaseRate, mrp, gstPercent, supplierName, supplierId, paymentStatus, amountDue } = req.body;
 
     const batch = await Batch.findById(req.params.id);
     if (!batch) {
@@ -143,6 +143,7 @@ const updateBatch = async (req, res, next) => {
         batch.initialQty = newQtyVal;
       }
     }
+    if (freeQty !== undefined) batch.freeQty = Math.max(0, Number(freeQty) || 0);
     if (purchaseRate !== undefined) batch.purchaseRate = Math.max(0, Number(purchaseRate) || 0);
     if (mrp !== undefined) batch.mrp = Math.max(0, Number(mrp) || 0);
     if (gstPercent !== undefined) batch.gstPercent = Math.max(0, Number(gstPercent) || 0);

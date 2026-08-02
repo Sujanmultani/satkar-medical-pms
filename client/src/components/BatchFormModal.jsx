@@ -3,6 +3,7 @@ import { Dialog, DialogFooter } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
+import { Select } from '@/components/ui/Select';
 import { SupplierAutocomplete } from '@/components/SupplierAutocomplete';
 
 export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initialData = null, isLoading = false }) {
@@ -12,10 +13,13 @@ export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initial
     expiryDate: '',
     receivedDate: new Date().toISOString().split('T')[0],
     qty: 0,
+    freeQty: 0,
     purchaseRate: 0,
     mrp: 0,
     gstPercent: 12,
     supplierName: '',
+    paymentStatus: 'pending',
+    amountDue: 0,
   });
 
   const [errors, setErrors] = useState({});
@@ -35,10 +39,13 @@ export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initial
         expiryDate: formatDateForInput(initialData.expiryDate),
         receivedDate: formatDateForInput(initialData.receivedDate || initialData.createdAt) || new Date().toISOString().split('T')[0],
         qty: initialData.qty !== undefined ? initialData.qty : 0,
+        freeQty: initialData.freeQty !== undefined ? initialData.freeQty : 0,
         purchaseRate: initialData.purchaseRate !== undefined ? initialData.purchaseRate : 0,
         mrp: initialData.mrp !== undefined ? initialData.mrp : 0,
         gstPercent: initialData.gstPercent !== undefined ? initialData.gstPercent : 12,
         supplierName: initialData.supplierId?.name || initialData.supplierName || '',
+        paymentStatus: initialData.paymentStatus || 'pending',
+        amountDue: initialData.amountDue !== undefined ? initialData.amountDue : 0,
       });
     } else {
       setFormData({
@@ -47,10 +54,13 @@ export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initial
         expiryDate: '',
         receivedDate: new Date().toISOString().split('T')[0],
         qty: 10,
+        freeQty: 0,
         purchaseRate: 0,
         mrp: 0,
         gstPercent: 12,
         supplierName: '',
+        paymentStatus: 'pending',
+        amountDue: 0,
       });
     }
     setErrors({});
@@ -78,6 +88,9 @@ export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initial
     if (Number(formData.qty) < 0) {
       newErrors.qty = 'Quantity cannot be negative.';
     }
+    if (Number(formData.freeQty) < 0) {
+      newErrors.freeQty = 'Free quantity cannot be negative.';
+    }
     if (Number(formData.purchaseRate) < 0) {
       newErrors.purchaseRate = 'Purchase rate cannot be negative.';
     }
@@ -102,10 +115,13 @@ export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initial
       mfgDate: formData.mfgDate ? formData.mfgDate : null,
       expiryDate: formData.expiryDate,
       qty: Number(formData.qty) || 0,
+      freeQty: Number(formData.freeQty) || 0,
       purchaseRate: Number(formData.purchaseRate) || 0,
       mrp: Number(formData.mrp) || 0,
       gstPercent: Number(formData.gstPercent) || 0,
       supplierName: formData.supplierName ? formData.supplierName.trim() : '',
+      paymentStatus: formData.paymentStatus,
+      amountDue: formData.paymentStatus === 'paid' ? 0 : (Number(formData.amountDue) || 0),
     });
   };
 
@@ -164,7 +180,43 @@ export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initial
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="qty">
+              Stock Quantity <span className="text-error">*</span>
+            </Label>
+            <Input
+              id="qty"
+              name="qty"
+              type="number"
+              min="0"
+              placeholder="0"
+              value={formData.qty}
+              onChange={handleChange}
+              error={errors.qty}
+              className="mt-1 font-mono"
+            />
+            {errors.qty && <p className="text-xs text-error mt-1">{errors.qty}</p>}
+          </div>
+
+          <div>
+            <Label htmlFor="freeQty">Free Qty (Bonus)</Label>
+            <Input
+              id="freeQty"
+              name="freeQty"
+              type="number"
+              min="0"
+              placeholder="0"
+              value={formData.freeQty}
+              onChange={handleChange}
+              error={errors.freeQty}
+              className="mt-1 font-mono"
+            />
+            {errors.freeQty && <p className="text-xs text-error mt-1">{errors.freeQty}</p>}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="receivedDate">Stock Entry Date</Label>
             <Input
@@ -187,24 +239,6 @@ export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initial
               onChange={handleChange}
               className="mt-1 font-mono"
             />
-          </div>
-
-          <div>
-            <Label htmlFor="qty">
-              Stock Quantity <span className="text-error">*</span>
-            </Label>
-            <Input
-              id="qty"
-              name="qty"
-              type="number"
-              min="0"
-              placeholder="0"
-              value={formData.qty}
-              onChange={handleChange}
-              error={errors.qty}
-              className="mt-1 font-mono"
-            />
-            {errors.qty && <p className="text-xs text-error mt-1">{errors.qty}</p>}
           </div>
         </div>
 
@@ -259,6 +293,46 @@ export function BatchFormModal({ isOpen, onClose, onSubmit, item = null, initial
             />
             {errors.gstPercent && <p className="text-xs text-error mt-1">{errors.gstPercent}</p>}
           </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 pt-1 border-t border-gray-100">
+          <div>
+            <Label htmlFor="paymentStatus">Payment Status</Label>
+            <Select
+              id="paymentStatus"
+              name="paymentStatus"
+              value={formData.paymentStatus}
+              onChange={(e) => {
+                const val = e.target.value;
+                setFormData((prev) => ({
+                  ...prev,
+                  paymentStatus: val,
+                  amountDue: val === 'paid' ? 0 : prev.amountDue,
+                }));
+              }}
+              className="mt-1 font-semibold"
+            >
+              <option value="pending">Pending (Unpaid)</option>
+              <option value="paid">Paid (Fully Settled)</option>
+            </Select>
+          </div>
+
+          {formData.paymentStatus === 'pending' && (
+            <div>
+              <Label htmlFor="amountDue">Amount Due (₹)</Label>
+              <Input
+                id="amountDue"
+                name="amountDue"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={formData.amountDue}
+                onChange={handleChange}
+                className="mt-1 font-mono text-amber-900 bg-amber-50/50"
+              />
+            </div>
+          )}
         </div>
 
         <DialogFooter>
