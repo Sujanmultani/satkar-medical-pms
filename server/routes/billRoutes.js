@@ -6,6 +6,7 @@ const {
   getBillById,
   markPrinted,
   shareBillStub,
+  deleteBill,
 } = require('../controllers/billController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -16,7 +17,8 @@ router.route('/')
   .get(getBills);
 
 router.route('/:id')
-  .get(getBillById);
+  .get(getBillById)
+  .delete(deleteBill);
 
 router.patch('/:id/mark-printed', markPrinted);
 router.post('/:id/share', shareBillStub);

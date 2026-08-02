@@ -2,6 +2,7 @@ const Bill = require('../models/Bill');
 const Batch = require('../models/Batch');
 const Item = require('../models/Item');
 const { roundMoney } = require('../utils/money');
+const { computeBatchStatus } = require('../utils/batchStatus');
 
 // Helper to generate unique readable bill number (INV-YYYYMMDD-XXXX)
 const generateBillNumber = async (dateObj) => {
@@ -320,10 +321,72 @@ const shareBillStub = async (req, res) => {
   });
 };
 
+// @desc    Delete bill (with option to restore or skip stock restoration)
+// @route   DELETE /api/bills/:id
+// @access  Private
+const deleteBill = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    // Accept restock from body or query (default to false if not specified)
+    const restock = req.body?.restock === true || req.query?.restock === 'true';
+
+    const bill = await Bill.findById(id);
+    if (!bill) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Bill not found.' },
+      });
+    }
+
+    let restoredItemsCount = 0;
+    const skippedItems = [];
+
+    if (restock) {
+      for (const lineItem of bill.items || []) {
+        if (!lineItem.batchId) continue;
+        const batchId = lineItem.batchId._id ? lineItem.batchId._id : lineItem.batchId;
+        const qtyToRestore = Number(lineItem.qty) || 0;
+
+        if (qtyToRestore <= 0) continue;
+
+        const batch = await Batch.findById(batchId);
+        if (!batch) {
+          skippedItems.push({
+            batchId: String(batchId),
+            reason: 'Batch record no longer exists in database.',
+          });
+          console.warn(`[Delete Bill Warning] Batch ${batchId} not found for stock restoration.`);
+          continue;
+        }
+
+        batch.qty += qtyToRestore;
+        if (batch.expiryDate) {
+          batch.status = computeBatchStatus(batch.expiryDate);
+        }
+        await batch.save();
+        restoredItemsCount++;
+      }
+    }
+
+    await Bill.findByIdAndDelete(id);
+
+    return res.status(200).json({
+      message: restock
+        ? `Bill ${bill.billNo} deleted and stock restored for ${restoredItemsCount} line item(s).`
+        : `Bill ${bill.billNo} deleted cleanly without modifying stock.`,
+      restocked: Boolean(restock),
+      restoredItemsCount,
+      skippedItems,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createBill,
   getBills,
   getBillById,
   markPrinted,
   shareBillStub,
+  deleteBill,
 };

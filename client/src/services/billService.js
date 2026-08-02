@@ -19,3 +19,11 @@ export const markPrinted = async (id) => {
   const response = await api.patch(`/bills/${id}/mark-printed`);
   return response.data;
 };
+
+export const deleteBill = async (id, { restock = false } = {}) => {
+  const response = await api.delete(`/bills/${id}`, {
+    data: { restock },
+    params: { restock },
+  });
+  return response.data;
+};

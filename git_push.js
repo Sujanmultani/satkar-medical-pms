@@ -17,7 +17,7 @@ try {
   console.log('--- Running git commit ---');
   try {
     const commitOutput = execSync(
-      'git commit -m "Add Free Quantity (FQTY/Scheme Qty) capture to invoice OCR scan and batch stock tracking"',
+      'git commit -m "Add Delete Bill feature with stock restoration choice to Bill History"',
       { encoding: 'utf8' }
     );
     console.log(commitOutput);

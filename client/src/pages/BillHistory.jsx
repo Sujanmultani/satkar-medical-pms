@@ -7,9 +7,10 @@ import {
   CheckCircle2, 
   Clock, 
   Calendar,
-  RotateCcw
+  RotateCcw,
+  Trash2
 } from 'lucide-react';
-import { getBills } from '@/services/billService';
+import { getBills, deleteBill } from '@/services/billService';
 import { createReturn } from '@/services/returnService';
 import { LogoWatermark } from '@/components/LogoWatermark';
 import { Card } from '@/components/ui/Card';
@@ -49,6 +50,29 @@ export function BillHistory() {
   // Printable Return Slip state
   const [createdReturnRecord, setCreatedReturnRecord] = useState(null);
   const [isPrintReturnModalOpen, setIsPrintReturnModalOpen] = useState(false);
+
+  // Delete Bill State
+  const [billToDelete, setBillToDelete] = useState(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleExecuteDelete = async (shouldRestock) => {
+    if (!billToDelete) return;
+    setIsDeleting(true);
+    try {
+      const res = await deleteBill(billToDelete._id, { restock: shouldRestock });
+      setIsDeleteModalOpen(false);
+      setBillToDelete(null);
+      fetchBillsList();
+      const msg = res.message || (shouldRestock ? 'Bill deleted and stock restored.' : 'Bill deleted, stock unchanged.');
+      alert(msg);
+    } catch (err) {
+      console.error('Failed to delete bill:', err);
+      alert(err.response?.data?.error?.message || 'Failed to delete bill. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const fetchBillsList = useCallback(async () => {
     setLoading(true);
@@ -451,6 +475,19 @@ export function BillHistory() {
                           <Printer className="w-3.5 h-3.5" />
                           <span>Reprint</span>
                         </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setBillToDelete(bill);
+                            setIsDeleteModalOpen(true);
+                          }}
+                          className="h-8 px-2 text-xs text-red-600 hover:text-red-800 hover:bg-red-50"
+                          title="Delete Bill"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -669,6 +706,87 @@ export function BillHistory() {
             returnRecord={createdReturnRecord}
           />
         )}
+
+        {/* Delete Confirmation Dialog with 3 options */}
+        <Dialog
+          isOpen={isDeleteModalOpen}
+          onClose={() => {
+            if (!isDeleting) {
+              setIsDeleteModalOpen(false);
+              setBillToDelete(null);
+            }
+          }}
+          title={`Delete Bill ${billToDelete?.billNo}?`}
+          description="Choose whether to restore inventory stock or delete without modifying stock."
+          className="max-w-md"
+        >
+          <div className="space-y-4 text-xs pt-1">
+            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 space-y-1 font-sans">
+              <p className="font-bold">⚠️ Warning: Permanent Action</p>
+              <p>Deleting bill <strong>{billToDelete?.billNo}</strong> cannot be undone. Please select how you want to handle inventory stock:</p>
+            </div>
+
+            <div className="space-y-3">
+              {/* Option 1: Delete & Restore Stock */}
+              <div className="p-3 rounded-xl border border-teal-200 bg-teal-50/50 hover:bg-teal-50 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-teal-900 text-xs">Option 1: Delete & Restore Stock</span>
+                  <Badge variant="success" className="text-[10px]">Restock</Badge>
+                </div>
+                <p className="text-[11px] text-gray-600">
+                  Use this if the bill was a mistake or duplicate entry — sold items will be added back to inventory stock.
+                </p>
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  disabled={isDeleting}
+                  onClick={() => handleExecuteDelete(true)}
+                  className="w-full h-8 text-xs font-semibold bg-teal-700 hover:bg-teal-800 text-white"
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete & Restore Stock (+Stock)'}
+                </Button>
+              </div>
+
+              {/* Option 2: Delete without Restoring Stock */}
+              <div className="p-3 rounded-xl border border-amber-200 bg-amber-50/50 hover:bg-amber-50 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-amber-900 text-xs">Option 2: Delete without Restoring Stock</span>
+                  <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-800">Keep Stock</Badge>
+                </div>
+                <p className="text-[11px] text-gray-600">
+                  Use this if items were genuinely given out — only the bill record is deleted, current stock stays unchanged.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isDeleting}
+                  onClick={() => handleExecuteDelete(false)}
+                  className="w-full h-8 text-xs font-semibold border-amber-400 text-amber-900 hover:bg-amber-100"
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete without Restoring Stock'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-gray-100">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={isDeleting}
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setBillToDelete(null);
+                }}
+                className="h-8 text-xs text-gray-600 hover:text-gray-900"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </Dialog>
       </div>
     </div>
   );
