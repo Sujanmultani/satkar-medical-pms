@@ -11,6 +11,7 @@ import { buildWhatsAppBillMessage, getWhatsAppShareLink } from '@/utils/whatsapp
 
 export function PrintableBill({ isOpen, onClose, bill, businessInfo }) {
   const [settings, setSettings] = useState(businessInfo || null);
+  const [isShared, setIsShared] = useState(bill?.shareStatus?.whatsapp || false);
 
   useEffect(() => {
     if (isOpen && !businessInfo) {
@@ -20,13 +21,11 @@ export function PrintableBill({ isOpen, onClose, bill, businessInfo }) {
     }
   }, [isOpen, businessInfo]);
 
-  if (!isOpen || !bill) return null;
-
-  const [isShared, setIsShared] = useState(bill?.shareStatus?.whatsapp || false);
-
   useEffect(() => {
     setIsShared(bill?.shareStatus?.whatsapp || false);
   }, [bill]);
+
+  if (!isOpen || !bill) return null;
 
   const handlePrint = async () => {
     window.print();
