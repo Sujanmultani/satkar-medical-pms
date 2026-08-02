@@ -33,6 +33,11 @@ const itemSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    location: {
+      type: String,
+      trim: true,
+      default: '',
+    },
   },
   {
     timestamps: true,

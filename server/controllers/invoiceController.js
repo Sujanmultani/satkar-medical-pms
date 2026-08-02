@@ -142,7 +142,7 @@ const confirmInvoice = async (req, res, next) => {
     const store = ['medical', 'provision'].includes(storeType) ? storeType : 'medical';
 
     for (const lineItem of items) {
-      const { name, composition, category, unit, hsnCode, batchNo, expiryDate, qty, purchaseRate, mrp, gstPercent } = lineItem;
+      const { name, composition, category, unit, hsnCode, location, batchNo, expiryDate, qty, purchaseRate, mrp, gstPercent } = lineItem;
 
       if (!name || !name.trim()) continue;
       if (!batchNo || !batchNo.trim()) continue;
@@ -166,6 +166,7 @@ const confirmInvoice = async (req, res, next) => {
           category: category ? category.trim() : (store === 'medical' ? 'Tablet / Medicine' : 'General'),
           unit: unit ? unit.trim() : (store === 'medical' ? 'strip' : 'piece'),
           hsnCode: hsnCode ? hsnCode.trim() : '',
+          location: location ? location.trim() : '',
         });
         createdItemsCount++;
       } else {
@@ -176,6 +177,10 @@ const confirmInvoice = async (req, res, next) => {
         }
         if (!item.hsnCode && hsnCode) {
           item.hsnCode = hsnCode.trim();
+          updated = true;
+        }
+        if (!item.location && location) {
+          item.location = location.trim();
           updated = true;
         }
         if (updated) {
@@ -273,7 +278,65 @@ const confirmInvoice = async (req, res, next) => {
   }
 };
 
+// @desc    Search invoice by invoice number
+// @route   GET /api/invoices/search
+// @access  Private
+const searchInvoiceByNumber = async (req, res, next) => {
+  try {
+    const { invoiceNo } = req.query;
+
+    if (!invoiceNo || !invoiceNo.trim()) {
+      return res.status(400).json({
+        error: { code: 'MISSING_INVOICE_NO', message: 'Invoice number query parameter is required.' },
+      });
+    }
+
+    const escapedNo = invoiceNo.trim().replace(/[/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const invoices = await Invoice.find({
+      invoiceNo: { $regex: new RegExp(escapedNo, 'i') },
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!invoices || invoices.length === 0) {
+      return res.status(404).json({
+        error: { code: 'INVOICE_NOT_FOUND', message: `No invoice found matching "${invoiceNo.trim()}".` },
+      });
+    }
+
+    const populatedInvoices = await Promise.all(
+      invoices.map(async (inv) => {
+        const itemsWithDetails = await Promise.all(
+          (inv.items || []).map(async (itemEntry) => {
+            let batchDetails = null;
+            if (itemEntry.batchId) {
+              batchDetails = await Batch.findById(itemEntry.batchId)
+                .populate('itemId', 'name composition category unit hsnCode location storeType')
+                .lean();
+            }
+            return {
+              ...itemEntry,
+              batch: batchDetails,
+            };
+          })
+        );
+        return {
+          ...inv,
+          items: itemsWithDetails,
+        };
+      })
+    );
+
+    return res.status(200).json({
+      data: populatedInvoices,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   scanInvoice,
   confirmInvoice,
+  searchInvoiceByNumber,
 };

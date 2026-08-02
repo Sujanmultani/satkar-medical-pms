@@ -14,9 +14,10 @@ import {
   Calendar,
   Receipt,
   Sparkles,
-  ShieldAlert
+  ShieldAlert,
+  Search
 } from 'lucide-react';
-import { scanInvoice, confirmInvoice } from '@/services/invoiceService';
+import { scanInvoice, confirmInvoice, searchInvoiceByNumber } from '@/services/invoiceService';
 import { LogoWatermark } from '@/components/LogoWatermark';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -38,6 +39,31 @@ export function InvoiceScan() {
   const [isDragging, setIsDragging] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Search Previous Invoice State
+  const [searchInvoiceNo, setSearchInvoiceNo] = useState('');
+  const [isSearchingInvoice, setIsSearchingInvoice] = useState(false);
+  const [searchInvoiceResults, setSearchInvoiceResults] = useState(null);
+  const [searchError, setSearchError] = useState(null);
+
+  const handleSearchInvoice = async (e) => {
+    if (e) e.preventDefault();
+    if (!searchInvoiceNo.trim()) return;
+
+    setIsSearchingInvoice(true);
+    setSearchError(null);
+    setSearchInvoiceResults(null);
+
+    try {
+      const res = await searchInvoiceByNumber(searchInvoiceNo.trim());
+      setSearchInvoiceResults(res.data || []);
+    } catch (err) {
+      console.error('Invoice Search Error:', err);
+      setSearchError(err.response?.data?.error?.message || 'No invoice found with this number.');
+    } finally {
+      setIsSearchingInvoice(false);
+    }
+  };
 
   // Extracted / Editable Data
   const [supplierName, setSupplierName] = useState('');
@@ -193,6 +219,8 @@ export function InvoiceScan() {
       {
         name: '',
         composition: '',
+        hsnCode: '',
+        location: '',
         batchNo: '',
         expiryDate: '',
         qty: 10,
@@ -361,6 +389,170 @@ export function InvoiceScan() {
             </Button>
           )}
         </div>
+
+        {/* FEATURE 1: SEARCH PREVIOUS INVOICE CARD */}
+        <Card className="p-5 bg-white/90 shadow-sm border border-secondary/20">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-heading font-bold text-primary uppercase tracking-wider flex items-center gap-2">
+                <Search className="w-4 h-4 text-secondary" />
+                <span>Search Previous Scanned Invoice</span>
+              </h3>
+              <p className="text-xs text-muted mt-0.5">
+                Type an invoice number to view its full saved details, line items, batches, and shelf locations.
+              </p>
+            </div>
+
+            <form onSubmit={handleSearchInvoice} className="flex items-center gap-2 w-full sm:w-auto">
+              <Input
+                type="text"
+                placeholder="Enter Invoice Number..."
+                value={searchInvoiceNo}
+                onChange={(e) => setSearchInvoiceNo(e.target.value)}
+                className="h-9 text-xs bg-white w-full sm:w-64 font-mono"
+              />
+              <Button
+                type="submit"
+                variant="default"
+                size="sm"
+                disabled={isSearchingInvoice || !searchInvoiceNo.trim()}
+                className="h-9 px-4 text-xs font-semibold gap-1.5 shrink-0"
+              >
+                {isSearchingInvoice ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Search className="w-3.5 h-3.5" />
+                )}
+                <span>Search</span>
+              </Button>
+            </form>
+          </div>
+
+          {/* Search Error / 404 Message */}
+          {searchError && (
+            <div className="mt-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center justify-between">
+              <span>{searchError}</span>
+              <button
+                type="button"
+                onClick={() => setSearchError(null)}
+                className="text-amber-600 hover:text-amber-800 font-bold ml-2"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Search Results Display */}
+          {searchInvoiceResults && searchInvoiceResults.length > 0 && (
+            <div className="mt-5 space-y-4 pt-4 border-t border-gray-100">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-primary font-mono">
+                  Found {searchInvoiceResults.length} Matched Invoice{searchInvoiceResults.length > 1 ? 's' : ''}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearchInvoiceResults(null);
+                    setSearchInvoiceNo('');
+                  }}
+                  className="h-7 text-xs text-gray-500 hover:text-gray-700"
+                >
+                  Clear Results
+                </Button>
+              </div>
+
+              {searchInvoiceResults.map((inv) => (
+                <div key={inv._id} className="p-4 rounded-xl bg-teal-50/40 border border-teal-200/80 space-y-3">
+                  {/* Header Details */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pb-3 border-b border-teal-200/60">
+                    <div>
+                      <span className="block text-[10px] uppercase font-mono text-muted">Invoice No</span>
+                      <span className="font-bold font-mono text-primary text-sm">{inv.invoiceNo}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] uppercase font-mono text-muted">Supplier</span>
+                      <span className="font-semibold text-gray-900">{inv.supplierName || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] uppercase font-mono text-muted">Invoice Date</span>
+                      <span className="font-mono text-gray-800">
+                        {inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] uppercase font-mono text-muted">Printed Total</span>
+                      <span className="font-bold font-mono text-teal-800">
+                        ₹{(inv.totalAmount || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Line Items Table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left border-collapse min-w-[800px]">
+                      <thead>
+                        <tr className="bg-white/80 border-b border-teal-200 text-gray-700 font-mono uppercase text-[10px]">
+                          <th className="py-2 px-3">Item Name</th>
+                          <th className="py-2 px-3">Composition</th>
+                          <th className="py-2 px-3">Location</th>
+                          <th className="py-2 px-3">Batch No</th>
+                          <th className="py-2 px-3">Expiry</th>
+                          <th className="py-2 px-2 text-center">Qty</th>
+                          <th className="py-2 px-2 text-right">P.Rate (₹)</th>
+                          <th className="py-2 px-2 text-right">MRP (₹)</th>
+                          <th className="py-2 px-2 text-center">GST %</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-teal-100/60 bg-white/60">
+                        {(inv.items || []).map((itemEntry, iIdx) => {
+                          const ext = itemEntry.extractedData || {};
+                          const batch = itemEntry.batch || {};
+                          const liveItem = batch.itemId || {};
+
+                          const name = liveItem.name || ext.name || 'N/A';
+                          const comp = liveItem.composition || ext.composition || '';
+                          const loc = liveItem.location || ext.location || '';
+                          const batchNo = batch.batchNo || ext.batchNo || 'N/A';
+                          const expiry = batch.expiryDate || ext.expiryDate;
+                          const qty = batch.initialQty !== undefined ? batch.initialQty : ext.qty;
+                          const pRate = batch.purchaseRate !== undefined ? batch.purchaseRate : ext.purchaseRate;
+                          const mrp = batch.mrp !== undefined ? batch.mrp : ext.mrp;
+                          const gst = batch.gstPercent !== undefined ? batch.gstPercent : ext.gstPercent;
+
+                          return (
+                            <tr key={iIdx} className="hover:bg-teal-100/40">
+                              <td className="py-2 px-3 font-semibold text-primary">{name}</td>
+                              <td className="py-2 px-3 text-muted text-[11px]">{comp || '-'}</td>
+                              <td className="py-2 px-3 font-medium text-teal-800">
+                                {loc ? (
+                                  <span className="px-1.5 py-0.5 rounded bg-teal-100 text-teal-900 font-mono text-[10px]">
+                                    📍 {loc}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400 font-mono text-[10px]">-</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 font-mono text-gray-800">{batchNo}</td>
+                              <td className="py-2 px-3 font-mono text-gray-700 text-[11px]">
+                                {expiry ? new Date(expiry).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : 'N/A'}
+                              </td>
+                              <td className="py-2 px-2 text-center font-mono font-bold text-primary">{qty}</td>
+                              <td className="py-2 px-2 text-right font-mono">₹{Number(pRate || 0).toFixed(2)}</td>
+                              <td className="py-2 px-2 text-right font-mono">₹{Number(mrp || 0).toFixed(2)}</td>
+                              <td className="py-2 px-2 text-center font-mono">{gst}%</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
 
         {/* STEP 1: UPLOAD ZONE */}
         {step === 'upload' && (
@@ -541,6 +733,7 @@ export function InvoiceScan() {
                       <th className="py-2.5 px-3 min-w-[260px] w-72">Item Name *</th>
                       {storeType === 'medical' && <th className="py-2.5 px-3 min-w-[220px] w-64">Composition</th>}
                       <th className="py-2.5 px-2 min-w-[110px] w-28">HSN Code</th>
+                      <th className="py-2.5 px-3 min-w-[150px] w-40">Shelf / Counter</th>
                       <th className="py-2.5 px-3 min-w-[130px] w-36">Batch No *</th>
                       <th className="py-2.5 px-3 min-w-[140px] w-36">Expiry Date {storeType === 'medical' ? '*' : ''}</th>
                       <th className="py-2.5 px-2 text-center min-w-[80px] w-20">Qty *</th>
@@ -617,6 +810,16 @@ export function InvoiceScan() {
                               onChange={(e) => handleItemChange(idx, 'hsnCode', e.target.value)}
                               placeholder="HSN Code"
                               className="h-8 text-xs font-mono w-full min-w-[100px]"
+                            />
+                          </td>
+
+                          {/* Shelf / Counter Location */}
+                          <td className="py-2 px-2 min-w-[150px]">
+                            <Input
+                              value={item.location || ''}
+                              onChange={(e) => handleItemChange(idx, 'location', e.target.value)}
+                              placeholder="e.g. Counter 2, Rack A"
+                              className="h-8 text-xs w-full min-w-[140px]"
                             />
                           </td>
 

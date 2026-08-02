@@ -22,7 +22,8 @@ export function ItemFormModal({ isOpen, onClose, onSubmit, initialData = null, s
         composition: initialData.composition || '',
         category: initialData.category || '',
         unit: initialData.unit || (storeType === 'medical' ? 'strip' : 'piece'),
-        hsnCode: initialData.hsnCode || '',
+    location: initialData?.location || '',
+        hsnCode: initialData?.hsnCode || '',
       });
     } else {
       setFormData({
@@ -31,6 +32,7 @@ export function ItemFormModal({ isOpen, onClose, onSubmit, initialData = null, s
         category: storeType === 'medical' ? 'Tablet / Capsule' : 'General Grocery',
         unit: storeType === 'medical' ? 'strip' : 'piece',
         hsnCode: '',
+        location: '',
       });
     }
     setErrors({});
@@ -129,16 +131,30 @@ export function ItemFormModal({ isOpen, onClose, onSubmit, initialData = null, s
           </div>
         </div>
 
-        <div>
-          <Label htmlFor="hsnCode">HSN Code</Label>
-          <Input
-            id="hsnCode"
-            name="hsnCode"
-            placeholder="e.g. 3004"
-            value={formData.hsnCode}
-            onChange={handleChange}
-            className="mt-1"
-          />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="hsnCode">HSN Code</Label>
+            <Input
+              id="hsnCode"
+              name="hsnCode"
+              placeholder="e.g. 3004"
+              value={formData.hsnCode}
+              onChange={handleChange}
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="location">Shelf / Counter Location</Label>
+            <Input
+              id="location"
+              name="location"
+              placeholder="e.g. Counter 2, Rack A"
+              value={formData.location}
+              onChange={handleChange}
+              className="mt-1"
+            />
+          </div>
         </div>
 
         <DialogFooter>

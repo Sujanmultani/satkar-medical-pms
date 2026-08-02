@@ -487,6 +487,11 @@ export function StockTable({ storeType = 'medical' }) {
                             HSN: {item.hsnCode}
                           </span>
                         )}
+                        {item.location && (
+                          <span className="ml-2 text-[10px] font-mono px-1.5 py-0.5 rounded bg-teal-100 text-teal-800 font-medium">
+                            📍 {item.location}
+                          </span>
+                        )}
                       </div>
                     </TableCell>
 

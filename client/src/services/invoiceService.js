@@ -17,3 +17,10 @@ export const confirmInvoice = async (invoiceData) => {
   const response = await api.post('/invoices/confirm', invoiceData);
   return response.data;
 };
+
+export const searchInvoiceByNumber = async (invoiceNo) => {
+  const response = await api.get('/invoices/search', {
+    params: { invoiceNo },
+  });
+  return response.data;
+};
