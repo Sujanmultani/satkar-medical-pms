@@ -11,7 +11,7 @@ import {
   Trash2,
   MessageCircle
 } from 'lucide-react';
-import { getBills, deleteBill, shareBill } from '@/services/billService';
+import { getBills, deleteBill, shareBill, getOrCreateShareLink } from '@/services/billService';
 import { buildWhatsAppBillMessage, getWhatsAppShareLink } from '@/utils/whatsappBill';
 import { createReturn } from '@/services/returnService';
 import { LogoWatermark } from '@/components/LogoWatermark';
@@ -481,16 +481,27 @@ export function BillHistory() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => {
-                            const message = buildWhatsAppBillMessage(bill, null);
-                            const waUrl = getWhatsAppShareLink(bill.customerPhone, message);
-                            window.open(waUrl, '_blank');
-                            if (bill._id) {
-                              shareBill(bill._id, { channel: 'whatsapp' }).catch(() => {});
+                          onClick={async () => {
+                            try {
+                              const res = await getOrCreateShareLink(bill._id);
+                              const shareUrl = res.data?.shareUrl || `https://www.satkarmedico.in/shared-bill/${res.data?.shareToken}`;
+                              const customerName = bill.customerName || 'Valued Customer';
+                              const billNo = bill.billNo || 'N/A';
+                              const total = Number(bill.totalAmount || 0).toFixed(2);
+
+                              const messageText = `🧾 *TAX INVOICE — Satkar Medical Store*\nBill No: ${billNo}\nCustomer: ${customerName}\nTotal Amount: ₹${total}\n\n🔗 *View your digital tax invoice here:*\n${shareUrl}\n\nThank you for visiting Satkar Medical Store! Wish you good health. 🙏`;
+
+                              const waUrl = getWhatsAppShareLink(bill.customerPhone, messageText);
+                              window.open(waUrl, '_blank');
+                              if (bill._id) {
+                                shareBill(bill._id, { channel: 'whatsapp' }).catch(() => {});
+                              }
+                            } catch (err) {
+                              console.error('Failed to generate share link:', err);
                             }
                           }}
                           className="h-8 px-2 text-xs text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50"
-                          title="Share via WhatsApp"
+                          title="Share via WhatsApp Link"
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
                         </Button>

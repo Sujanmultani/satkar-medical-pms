@@ -15,6 +15,8 @@ import { Suppliers } from '@/pages/Suppliers';
 import { Settings } from '@/pages/Settings';
 import { Sidebar } from '@/components/Sidebar';
 
+import { SharedBillView } from '@/pages/SharedBillView';
+
 // Protected Route Wrapper
 function ProtectedLayout() {
   const { isAuthenticated } = useAuthStore();
@@ -72,6 +74,9 @@ export default function App() {
             </PublicRoute>
           }
         />
+        {/* Public Shareable Bill View (No Auth Required) */}
+        <Route path="/shared-bill/:token" element={<SharedBillView />} />
+
         <Route path="/*" element={<ProtectedLayout />} />
       </Routes>
     </Router>

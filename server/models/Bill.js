@@ -67,6 +67,11 @@ const billSchema = new mongoose.Schema(
       sms: { type: Boolean, default: false },
       printed: { type: Boolean, default: false },
     },
+    shareToken: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
   },
   {
     timestamps: true,

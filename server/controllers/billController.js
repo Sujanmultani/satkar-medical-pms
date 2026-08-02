@@ -3,6 +3,7 @@ const Batch = require('../models/Batch');
 const Item = require('../models/Item');
 const { roundMoney } = require('../utils/money');
 const { computeBatchStatus } = require('../utils/batchStatus');
+const crypto = require('crypto');
 
 // Helper to generate unique readable bill number (INV-YYYYMMDD-XXXX)
 const generateBillNumber = async (dateObj) => {
@@ -403,6 +404,79 @@ const deleteBill = async (req, res, next) => {
   }
 };
 
+// @desc    Get or generate public share link for a bill (Authenticated)
+// @route   GET /api/bills/:id/share-link
+// @access  Private
+const getOrCreateShareLink = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const bill = await Bill.findById(id);
+    if (!bill) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Bill not found.' },
+      });
+    }
+
+    if (!bill.shareToken) {
+      bill.shareToken = crypto.randomBytes(24).toString('hex');
+      await bill.save();
+    }
+
+    const baseUrl = process.env.CLIENT_URL || 'https://www.satkarmedico.in';
+    const shareUrl = `${baseUrl.replace(/\/$/, '')}/shared-bill/${bill.shareToken}`;
+
+    return res.status(200).json({
+      data: {
+        shareUrl,
+        shareToken: bill.shareToken,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get public bill details by share token (Public - No Auth)
+// @route   GET /api/bills/public/:token
+// @access  Public
+const getBillByShareToken = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+    if (!token || typeof token !== 'string') {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Bill not found or link expired.' },
+      });
+    }
+
+    const bill = await Bill.findOne({ shareToken: token })
+      .populate('items.itemId', 'name composition category unit hsnCode storeType')
+      .populate('items.batchId', 'batchNo expiryDate mrp')
+      .lean();
+
+    if (!bill) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Bill not found or link expired.' },
+      });
+    }
+
+    const publicBill = {
+      _id: bill._id,
+      billNo: bill.billNo,
+      billDate: bill.billDate,
+      customerName: bill.customerName,
+      customerPhone: bill.customerPhone,
+      items: bill.items,
+      gstBreakdown: bill.gstBreakdown,
+      totalAmount: bill.totalAmount,
+      paymentMode: bill.paymentMode,
+    };
+
+    return res.status(200).json({ data: publicBill });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createBill,
   getBills,
@@ -410,4 +484,6 @@ module.exports = {
   markPrinted,
   shareBill,
   deleteBill,
+  getOrCreateShareLink,
+  getBillByShareToken,
 };

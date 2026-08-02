@@ -32,3 +32,13 @@ export const deleteBill = async (id, { restock = false } = {}) => {
   });
   return response.data;
 };
+
+export const getOrCreateShareLink = async (id) => {
+  const response = await api.get(`/bills/${id}/share-link`);
+  return response.data;
+};
+
+export const getBillByShareToken = async (token) => {
+  const response = await api.get(`/bills/public/${token}`);
+  return response.data;
+};
