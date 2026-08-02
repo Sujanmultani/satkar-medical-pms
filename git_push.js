@@ -17,7 +17,7 @@ try {
   console.log('--- Running git commit ---');
   try {
     const commitOutput = execSync(
-      'git commit -m "Add root vercel.json for Vercel API proxy rewrite"',
+      'git commit -m "Add request log middleware to server.js for route diagnosis"',
       { encoding: 'utf8' }
     );
     console.log(commitOutput);

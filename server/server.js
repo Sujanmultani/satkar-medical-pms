@@ -41,6 +41,12 @@ connectDB().then(() => {
 
 const app = express();
 
+// Temporary request logging to diagnose route handling in production
+app.use((req, res, next) => {
+  console.log(`[REQUEST LOG] ${req.method} ${req.originalUrl}`);
+  next();
+});
+
 // HTTP Security Headers
 if (helmet) {
   app.use(helmet({ contentSecurityPolicy: false }));
