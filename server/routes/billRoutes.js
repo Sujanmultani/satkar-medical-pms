@@ -5,7 +5,7 @@ const {
   getBills,
   getBillById,
   markPrinted,
-  shareBillStub,
+  shareBill,
   deleteBill,
 } = require('../controllers/billController');
 const { protect } = require('../middleware/authMiddleware');
@@ -21,6 +21,6 @@ router.route('/:id')
   .delete(deleteBill);
 
 router.patch('/:id/mark-printed', markPrinted);
-router.post('/:id/share', shareBillStub);
+router.post('/:id/share', shareBill);
 
 module.exports = router;

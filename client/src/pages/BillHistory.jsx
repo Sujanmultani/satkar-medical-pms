@@ -8,9 +8,11 @@ import {
   Clock, 
   Calendar,
   RotateCcw,
-  Trash2
+  Trash2,
+  MessageCircle
 } from 'lucide-react';
-import { getBills, deleteBill } from '@/services/billService';
+import { getBills, deleteBill, shareBill } from '@/services/billService';
+import { buildWhatsAppBillMessage, getWhatsAppShareLink } from '@/utils/whatsappBill';
 import { createReturn } from '@/services/returnService';
 import { LogoWatermark } from '@/components/LogoWatermark';
 import { Card } from '@/components/ui/Card';
@@ -474,6 +476,23 @@ export function BillHistory() {
                         >
                           <Printer className="w-3.5 h-3.5" />
                           <span>Reprint</span>
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const message = buildWhatsAppBillMessage(bill, null);
+                            const waUrl = getWhatsAppShareLink(bill.customerPhone, message);
+                            window.open(waUrl, '_blank');
+                            if (bill._id) {
+                              shareBill(bill._id, { channel: 'whatsapp' }).catch(() => {});
+                            }
+                          }}
+                          className="h-8 px-2 text-xs text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50"
+                          title="Share via WhatsApp"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
                         </Button>
 
                         <Button

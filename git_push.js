@@ -17,7 +17,7 @@ try {
   console.log('--- Running git commit ---');
   try {
     const commitOutput = execSync(
-      'git commit -m "fix: remove invalid nested backticks in EXTRACTION_PROMPT causing server crash on boot"',
+      'git commit -m "feat: Phase 6.5 - Share Bill via WhatsApp wa.me link and status tracking"',
       { encoding: 'utf8' }
     );
     console.log(commitOutput);

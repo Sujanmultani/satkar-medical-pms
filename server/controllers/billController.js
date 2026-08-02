@@ -309,16 +309,37 @@ const markPrinted = async (req, res, next) => {
   }
 };
 
-// @desc    WhatsApp/SMS sharing stub
+// @desc    Track WhatsApp/SMS sharing status
 // @route   POST /api/bills/:id/share
 // @access  Private
-const shareBillStub = async (req, res) => {
-  return res.status(501).json({
-    error: {
-      code: 'NOT_IMPLEMENTED',
-      message: 'Bill sharing via WhatsApp/SMS is coming in Phase 6.5.',
-    },
-  });
+const shareBill = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { channel = 'whatsapp' } = req.body || {};
+
+    const bill = await Bill.findById(id);
+    if (!bill) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Bill not found.' },
+      });
+    }
+
+    if (!bill.shareStatus) {
+      bill.shareStatus = { whatsapp: false, sms: false, printed: false };
+    }
+
+    if (channel === 'whatsapp') {
+      bill.shareStatus.whatsapp = true;
+    } else if (channel === 'sms') {
+      bill.shareStatus.sms = true;
+    }
+
+    await bill.save();
+
+    return res.status(200).json({ data: bill });
+  } catch (error) {
+    next(error);
+  }
 };
 
 // @desc    Delete bill (with option to restore or skip stock restoration)
@@ -387,6 +408,6 @@ module.exports = {
   getBills,
   getBillById,
   markPrinted,
-  shareBillStub,
+  shareBill,
   deleteBill,
 };

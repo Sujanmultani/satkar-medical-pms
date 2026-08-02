@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
-import { markPrinted } from '@/services/billService';
+import { markPrinted, shareBill } from '@/services/billService';
 import { getSettings } from '@/services/settingsService';
 import logoAsset from '@/assets/satkar-logo.jpeg';
 import { Printer, MessageCircle } from 'lucide-react';
 import { roundMoney } from '@/utils/money';
+import { buildWhatsAppBillMessage, getWhatsAppShareLink } from '@/utils/whatsappBill';
 
 export function PrintableBill({ isOpen, onClose, bill, businessInfo }) {
   const [settings, setSettings] = useState(businessInfo || null);
@@ -21,6 +22,12 @@ export function PrintableBill({ isOpen, onClose, bill, businessInfo }) {
 
   if (!isOpen || !bill) return null;
 
+  const [isShared, setIsShared] = useState(bill?.shareStatus?.whatsapp || false);
+
+  useEffect(() => {
+    setIsShared(bill?.shareStatus?.whatsapp || false);
+  }, [bill]);
+
   const handlePrint = async () => {
     window.print();
     try {
@@ -29,6 +36,18 @@ export function PrintableBill({ isOpen, onClose, bill, businessInfo }) {
       }
     } catch (err) {
       console.error('Failed to mark bill as printed:', err);
+    }
+  };
+
+  const handleWhatsAppShare = () => {
+    const message = buildWhatsAppBillMessage(bill, settings);
+    const waUrl = getWhatsAppShareLink(bill.customerPhone, message);
+    window.open(waUrl, '_blank');
+
+    if (bill._id) {
+      shareBill(bill._id, { channel: 'whatsapp' })
+        .then(() => setIsShared(true))
+        .catch((err) => console.warn('Failed to record WhatsApp share status:', err));
     }
   };
 
@@ -178,16 +197,18 @@ export function PrintableBill({ isOpen, onClose, bill, businessInfo }) {
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                disabled
-                className="gap-2 opacity-50 cursor-not-allowed text-xs"
-                title="WhatsApp / SMS integration is scheduled for Phase 6.5"
+                onClick={handleWhatsAppShare}
+                className="gap-2 text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                title="Share bill via WhatsApp"
               >
-                <MessageCircle className="w-3.5 h-3.5 text-secondary" />
-                <span>Share via WhatsApp / SMS</span>
+                <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Share via WhatsApp</span>
+                {isShared && (
+                  <span className="ml-1 text-[10px] text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.5 rounded">
+                    ✓ Shared
+                  </span>
+                )}
               </Button>
-              <span className="text-[10px] text-muted font-mono bg-gray-100 px-2 py-1 rounded">
-                Coming in Phase 6.5
-              </span>
             </div>
 
             <div className="flex items-center gap-2">

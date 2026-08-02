@@ -20,6 +20,11 @@ export const markPrinted = async (id) => {
   return response.data;
 };
 
+export const shareBill = async (id, { channel = 'whatsapp' } = {}) => {
+  const response = await api.post(`/bills/${id}/share`, { channel });
+  return response.data;
+};
+
 export const deleteBill = async (id, { restock = false } = {}) => {
   const response = await api.delete(`/bills/${id}`, {
     data: { restock },
