@@ -1,3 +1,5 @@
+import html2canvas from 'html2canvas';
+
 /**
  * Formats a clean plain-text WhatsApp bill summary message.
  * @param {Object} bill - Sales bill document
@@ -62,4 +64,34 @@ export const getWhatsAppShareLink = (phone, message) => {
 
   const phoneWithCountry = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
   return `https://wa.me/${phoneWithCountry}?text=${encodedText}`;
+};
+
+/**
+ * Renders a DOM element to a high-resolution PNG image Blob.
+ * @param {HTMLElement} element - The DOM node to render
+ * @param {String} billNo - Bill number for filename
+ * @returns {Promise<{ blob: Blob, filename: String }>}
+ */
+export const generateBillImageBlob = async (element, billNo = 'INV') => {
+  if (!element) throw new Error('DOM element is required to generate bill image');
+
+  const canvas = await html2canvas(element, {
+    scale: 2,
+    useCORS: true,
+    backgroundColor: '#ffffff',
+    logging: false,
+  });
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        return reject(new Error('Failed to convert bill canvas to PNG image blob'));
+      }
+      const safeBillNo = String(billNo).replace(/[/\\?%*:|"<>]/g, '_');
+      resolve({
+        blob,
+        filename: `Bill-${safeBillNo}.png`,
+      });
+    }, 'image/png');
+  });
 };

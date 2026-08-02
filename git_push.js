@@ -17,7 +17,7 @@ try {
   console.log('--- Running git commit ---');
   try {
     const commitOutput = execSync(
-      'git commit -m "fix: move React hooks above early return in PrintableBill to prevent blank page crash"',
+      'git commit -m "feat: Phase 6.5 - Share Bill via WhatsApp with PNG image rendering and mobile/desktop paths"',
       { encoding: 'utf8' }
     );
     console.log(commitOutput);

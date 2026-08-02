@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
@@ -7,7 +7,7 @@ import { getSettings } from '@/services/settingsService';
 import logoAsset from '@/assets/satkar-logo.jpeg';
 import { Printer, MessageCircle } from 'lucide-react';
 import { roundMoney } from '@/utils/money';
-import { buildWhatsAppBillMessage, getWhatsAppShareLink } from '@/utils/whatsappBill';
+import { buildWhatsAppBillMessage, getWhatsAppShareLink, generateBillImageBlob } from '@/utils/whatsappBill';
 
 export function PrintableBill({ isOpen, onClose, bill, businessInfo }) {
   const [settings, setSettings] = useState(businessInfo || null);
@@ -21,8 +21,13 @@ export function PrintableBill({ isOpen, onClose, bill, businessInfo }) {
     }
   }, [isOpen, businessInfo]);
 
+  const paperRef = useRef(null);
+  const [isPreparing, setIsPreparing] = useState(false);
+  const [downloadNotice, setDownloadNotice] = useState('');
+
   useEffect(() => {
     setIsShared(bill?.shareStatus?.whatsapp || false);
+    setDownloadNotice('');
   }, [bill]);
 
   if (!isOpen || !bill) return null;
@@ -38,15 +43,62 @@ export function PrintableBill({ isOpen, onClose, bill, businessInfo }) {
     }
   };
 
-  const handleWhatsAppShare = () => {
-    const message = buildWhatsAppBillMessage(bill, settings);
-    const waUrl = getWhatsAppShareLink(bill.customerPhone, message);
-    window.open(waUrl, '_blank');
+  const handleWhatsAppShare = async () => {
+    if (!paperRef.current || isPreparing) return;
+    setIsPreparing(true);
+    setDownloadNotice('');
 
-    if (bill._id) {
-      shareBill(bill._id, { channel: 'whatsapp' })
-        .then(() => setIsShared(true))
-        .catch((err) => console.warn('Failed to record WhatsApp share status:', err));
+    try {
+      const { blob, filename } = await generateBillImageBlob(paperRef.current, bill.billNo);
+      const message = buildWhatsAppBillMessage(bill, settings);
+
+      const canShareFiles =
+        typeof navigator !== 'undefined' &&
+        typeof navigator.share === 'function' &&
+        typeof navigator.canShare === 'function' &&
+        navigator.canShare({ files: [new File([blob], filename, { type: 'image/png' })] });
+
+      if (canShareFiles) {
+        // MOBILE PATH: native share sheet with the image + a text caption
+        const file = new File([blob], filename, { type: 'image/png' });
+        try {
+          await navigator.share({
+            files: [file],
+            text: message,
+          });
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            console.warn('[WhatsApp Share] navigator.share failed:', err);
+          }
+        }
+      } else {
+        // DESKTOP / UNSUPPORTED PATH: open wa.me text link AND auto-download the image
+        const waUrl = getWhatsAppShareLink(bill.customerPhone, message);
+        window.open(waUrl, '_blank');
+
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(downloadUrl);
+
+        setDownloadNotice(
+          'Bill image downloaded — attach it in the WhatsApp chat that just opened if you would like to send the photo too.'
+        );
+      }
+
+      if (bill._id) {
+        shareBill(bill._id, { channel: 'whatsapp' })
+          .then(() => setIsShared(true))
+          .catch((err) => console.warn('Failed to record WhatsApp share status:', err));
+      }
+    } catch (error) {
+      console.error('Failed to generate or share bill image:', error);
+    } finally {
+      setIsPreparing(false);
     }
   };
 
@@ -187,9 +239,15 @@ export function PrintableBill({ isOpen, onClose, bill, businessInfo }) {
         className="max-w-3xl"
       >
         <div className="space-y-6">
-          <div className="p-6 bg-white rounded-xl border border-gray-200 text-xs text-text shadow-sm">
+          <div ref={paperRef} className="p-6 bg-white rounded-xl border border-gray-200 text-xs text-text shadow-sm">
             {renderPaperContent()}
           </div>
+
+          {downloadNotice && (
+            <p className="text-[11px] font-medium text-emerald-800 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200">
+              ℹ️ {downloadNotice}
+            </p>
+          )}
 
           {/* Modal Action Bar */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-gray-100">
@@ -197,12 +255,13 @@ export function PrintableBill({ isOpen, onClose, bill, businessInfo }) {
               <Button
                 variant="outline"
                 onClick={handleWhatsAppShare}
+                disabled={isPreparing}
                 className="gap-2 text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-50"
                 title="Share bill via WhatsApp"
               >
                 <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Share via WhatsApp</span>
-                {isShared && (
+                <span>{isPreparing ? 'Preparing Image...' : 'Share via WhatsApp'}</span>
+                {isShared && !isPreparing && (
                   <span className="ml-1 text-[10px] text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.5 rounded">
                     ✓ Shared
                   </span>
