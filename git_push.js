@@ -17,7 +17,7 @@ try {
   console.log('--- Running git commit ---');
   try {
     const commitOutput = execSync(
-      'git commit -m "Add request log middleware to server.js for route diagnosis"',
+      'git commit -m "fix: remove invalid nested backticks in EXTRACTION_PROMPT causing server crash on boot"',
       { encoding: 'utf8' }
     );
     console.log(commitOutput);
