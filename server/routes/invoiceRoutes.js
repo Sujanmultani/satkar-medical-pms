@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const { scanInvoice, confirmInvoice, searchInvoiceByNumber } = require('../controllers/invoiceController');
+const { scanInvoice, confirmInvoice, searchInvoiceByNumber, deleteInvoice } = require('../controllers/invoiceController');
 const { protect } = require('../middleware/authMiddleware');
 const { scanRateLimiter } = require('../middleware/rateLimiter');
 
@@ -25,5 +25,6 @@ router.use(protect);
 router.get('/search', searchInvoiceByNumber);
 router.post('/scan', scanRateLimiter, upload.single('image'), scanInvoice);
 router.post('/confirm', confirmInvoice);
+router.delete('/:id', deleteInvoice);
 
 module.exports = router;

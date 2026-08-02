@@ -340,8 +340,95 @@ const searchInvoiceByNumber = async (req, res, next) => {
   }
 };
 
+// @desc    Delete invoice with optional stock rollback
+// @route   DELETE /api/invoices/:id
+// @access  Private
+const deleteInvoice = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const rollbackStock = Boolean(
+      req.body?.rollbackStock !== undefined ? req.body.rollbackStock : req.query?.rollbackStock
+    );
+
+    const invoice = await Invoice.findById(id);
+    if (!invoice) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Invoice record not found.' },
+      });
+    }
+
+    const partialRollbackWarnings = [];
+    let itemsRolledBackCount = 0;
+    let itemsSkippedCount = 0;
+
+    if (rollbackStock && Array.isArray(invoice.items)) {
+      for (const item of invoice.items) {
+        const extData = item.extractedData || {};
+        const paidQty = Math.max(0, Number(extData.qty) || 0);
+        const freeQty = Math.max(0, Number(extData.freeQty) || 0);
+        const qtyToRemove = paidQty + freeQty;
+
+        if (!item.batchId || qtyToRemove <= 0) {
+          itemsSkippedCount++;
+          continue;
+        }
+
+        const batch = await Batch.findById(item.batchId);
+        if (!batch) {
+          console.warn(`[Delete Invoice] Batch ${item.batchId} not found, skipping stock rollback for this item.`);
+          itemsSkippedCount++;
+          continue;
+        }
+
+        const itemName = extData.name || 'Medicine/Item';
+        const batchNo = batch.batchNo || extData.batchNo || 'N/A';
+        const currentQty = Number(batch.qty) || 0;
+        const newQty = currentQty - qtyToRemove;
+
+        if (newQty >= 0) {
+          batch.qty = newQty;
+          batch.initialQty = Math.max(0, (Number(batch.initialQty) || currentQty) - qtyToRemove);
+        } else {
+          // Stock already partially sold beyond what can be rolled back safely
+          batch.qty = 0;
+          batch.initialQty = 0;
+          partialRollbackWarnings.push({
+            batchId: batch._id,
+            batchNo,
+            itemName,
+            attemptedRollback: qtyToRemove,
+            availableBeforeDelete: currentQty,
+            message: `Batch "${batchNo}" (${itemName}) had ${currentQty} units left in stock, but invoice added ${qtyToRemove} units. Stock clamped to 0 (${qtyToRemove - currentQty} already-sold units could not be reversed).`,
+          });
+        }
+
+        if (batch.expiryDate) {
+          batch.status = computeBatchStatus(batch.expiryDate);
+        }
+        await batch.save();
+        itemsRolledBackCount++;
+      }
+    }
+
+    await Invoice.findByIdAndDelete(id);
+
+    return res.status(200).json({
+      message: rollbackStock
+        ? `Invoice ${invoice.invoiceNo} deleted and stock rolled back for ${itemsRolledBackCount} line item(s).`
+        : `Invoice ${invoice.invoiceNo} deleted cleanly without modifying stock.`,
+      rolledBack: Boolean(rollbackStock),
+      itemsRolledBackCount,
+      itemsSkippedCount,
+      partialRollbackWarnings,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   scanInvoice,
   confirmInvoice,
   searchInvoiceByNumber,
+  deleteInvoice,
 };

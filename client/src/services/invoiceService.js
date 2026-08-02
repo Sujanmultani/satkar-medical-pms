@@ -24,3 +24,11 @@ export const searchInvoiceByNumber = async (invoiceNo) => {
   });
   return response.data;
 };
+
+export const deleteInvoice = async (id, { rollbackStock = false } = {}) => {
+  const response = await api.delete(`/invoices/${id}`, {
+    data: { rollbackStock },
+    params: { rollbackStock },
+  });
+  return response.data;
+};

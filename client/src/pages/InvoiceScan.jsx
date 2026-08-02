@@ -17,10 +17,11 @@ import {
   ShieldAlert,
   Search
 } from 'lucide-react';
-import { scanInvoice, confirmInvoice, searchInvoiceByNumber } from '@/services/invoiceService';
+import { scanInvoice, confirmInvoice, searchInvoiceByNumber, deleteInvoice } from '@/services/invoiceService';
 import { LogoWatermark } from '@/components/LogoWatermark';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Dialog } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
@@ -60,8 +61,38 @@ export function InvoiceScan() {
     } catch (err) {
       console.error('Invoice Search Error:', err);
       setSearchError(err.response?.data?.error?.message || 'No invoice found with this number.');
+  };
+
+  // Delete Invoice Modal State
+  const [invoiceToDelete, setInvoiceToDelete] = useState(null);
+  const [isDeleteInvoiceModalOpen, setIsDeleteInvoiceModalOpen] = useState(false);
+  const [isDeletingInvoice, setIsDeletingInvoice] = useState(false);
+  const [deleteWarnings, setDeleteWarnings] = useState([]);
+  const [deleteSuccessMsg, setDeleteSuccessMsg] = useState('');
+
+  const handleDeleteInvoiceSubmit = async (rollbackStock) => {
+    if (!invoiceToDelete?._id || isDeletingInvoice) return;
+    setIsDeletingInvoice(true);
+    setDeleteWarnings([]);
+    setDeleteSuccessMsg('');
+
+    try {
+      const res = await deleteInvoice(invoiceToDelete._id, { rollbackStock });
+      const targetNo = invoiceToDelete.invoiceNo;
+
+      setSearchInvoiceResults((prev) => (prev || []).filter((inv) => inv._id !== invoiceToDelete._id));
+
+      if (res.partialRollbackWarnings && res.partialRollbackWarnings.length > 0) {
+        setDeleteWarnings(res.partialRollbackWarnings);
+      }
+      setDeleteSuccessMsg(res.message || `Invoice ${targetNo} deleted successfully.`);
+      setIsDeleteInvoiceModalOpen(false);
+      setInvoiceToDelete(null);
+    } catch (err) {
+      console.error('Failed to delete invoice:', err);
+      alert(err.response?.data?.error?.message || 'Failed to delete invoice. Please try again.');
     } finally {
-      setIsSearchingInvoice(false);
+      setIsDeletingInvoice(false);
     }
   };
 
@@ -441,6 +472,35 @@ export function InvoiceScan() {
             </div>
           )}
 
+          {/* Delete Success Alert */}
+          {deleteSuccessMsg && (
+            <div className="mt-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between font-medium">
+              <span>✓ {deleteSuccessMsg}</span>
+              <button
+                type="button"
+                onClick={() => setDeleteSuccessMsg('')}
+                className="text-emerald-600 hover:text-emerald-800 font-bold ml-2"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Partial Rollback Warning Alerts */}
+          {deleteWarnings.length > 0 && (
+            <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-900 space-y-1.5 font-mono">
+              <p className="font-bold text-amber-950 font-sans flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 text-amber-700" />
+                <span>Partial Rollback Warning ({deleteWarnings.length} item(s)):</span>
+              </p>
+              {deleteWarnings.map((warn, wIdx) => (
+                <p key={wIdx} className="text-[11px] leading-relaxed">
+                  ⚠️ {warn.message}
+                </p>
+              ))}
+            </div>
+          )}
+
           {/* Search Results Display */}
           {searchInvoiceResults && searchInvoiceResults.length > 0 && (
             <div className="mt-5 space-y-4 pt-4 border-t border-gray-100">
@@ -465,7 +525,7 @@ export function InvoiceScan() {
               {searchInvoiceResults.map((inv) => (
                 <div key={inv._id} className="p-4 rounded-xl bg-teal-50/40 border border-teal-200/80 space-y-3">
                   {/* Header Details */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pb-3 border-b border-teal-200/60">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs pb-3 border-b border-teal-200/60 items-center">
                     <div>
                       <span className="block text-[10px] uppercase font-mono text-muted">Invoice No</span>
                       <span className="font-bold font-mono text-primary text-sm">{inv.invoiceNo}</span>
@@ -485,6 +545,22 @@ export function InvoiceScan() {
                       <span className="font-bold font-mono text-teal-800">
                         ₹{(inv.totalAmount || 0).toFixed(2)}
                       </span>
+                    </div>
+                    <div className="text-right sm:text-right col-span-2 sm:col-span-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setInvoiceToDelete(inv);
+                          setIsDeleteInvoiceModalOpen(true);
+                        }}
+                        className="h-8 px-2.5 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 gap-1.5 font-medium border border-red-200/60 rounded-lg"
+                        title="Delete Invoice"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                        <span>Delete Invoice</span>
+                      </Button>
                     </div>
                   </div>
 
@@ -1047,6 +1123,81 @@ export function InvoiceScan() {
               </Button>
             </div>
           </Card>
+        )}
+
+        {/* Delete Invoice Confirmation Modal */}
+        {isDeleteInvoiceModalOpen && invoiceToDelete && (
+          <Dialog
+            isOpen={isDeleteInvoiceModalOpen}
+            onClose={() => {
+              if (!isDeletingInvoice) {
+                setIsDeleteInvoiceModalOpen(false);
+                setInvoiceToDelete(null);
+              }
+            }}
+            title={`Delete Invoice ${invoiceToDelete.invoiceNo}`}
+            description="Choose how you want to handle the stock added by this invoice."
+            className="max-w-md"
+          >
+            <div className="space-y-4 pt-2">
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800 flex items-start gap-2.5">
+                <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-red-900">Warning: Permanent Action</p>
+                  <p className="mt-0.5 text-[11px] text-red-700">
+                    Deleting invoice <strong className="font-mono">{invoiceToDelete.invoiceNo}</strong> cannot be undone.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  onClick={() => handleDeleteInvoiceSubmit(true)}
+                  disabled={isDeletingInvoice}
+                  className="w-full justify-start text-xs font-semibold p-3 h-auto bg-amber-50/60 border-amber-300 text-amber-950 hover:bg-amber-100/80 flex items-start gap-3"
+                >
+                  <Trash2 className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <div className="text-left">
+                    <span className="font-bold block text-amber-900">1. Delete & Rollback Stock</span>
+                    <span className="text-[10px] font-normal text-amber-800 block mt-0.5">
+                      Removes the quantity this invoice added from stock. Use this if the invoice was a mistake or duplicate scan.
+                    </span>
+                  </div>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={() => handleDeleteInvoiceSubmit(false)}
+                  disabled={isDeletingInvoice}
+                  className="w-full justify-start text-xs font-semibold p-3 h-auto bg-gray-50 border-gray-300 text-gray-900 hover:bg-gray-100 flex items-start gap-3"
+                >
+                  <Trash2 className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
+                  <div className="text-left">
+                    <span className="font-bold block text-gray-900">2. Delete without Adjusting Stock</span>
+                    <span className="text-[10px] font-normal text-gray-600 block mt-0.5">
+                      Only removes this invoice record. Current stock levels stay exactly as they are.
+                    </span>
+                  </div>
+                </Button>
+              </div>
+
+              <div className="pt-2 border-t border-gray-100 flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setIsDeleteInvoiceModalOpen(false);
+                    setInvoiceToDelete(null);
+                  }}
+                  disabled={isDeletingInvoice}
+                  className="text-xs"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </Dialog>
         )}
       </div>
     </div>

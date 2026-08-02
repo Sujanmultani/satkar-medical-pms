@@ -17,7 +17,7 @@ try {
   console.log('--- Running git commit ---');
   try {
     const commitOutput = execSync(
-      'git commit -m "feat: Fix OCR Missing Line Items with auto-retry, maxOutputTokens, and missing items warning banner"',
+      'git commit -m "feat: Delete Invoice feature with optional stock rollback choice and partial rollback warnings"',
       { encoding: 'utf8' }
     );
     console.log(commitOutput);
