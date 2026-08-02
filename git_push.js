@@ -17,7 +17,7 @@ try {
   console.log('--- Running git commit ---');
   try {
     const commitOutput = execSync(
-      'git commit -m "feat: Enable editing location on items, and freeQty, paymentStatus, amountDue on batches"',
+      'git commit -m "fix: Add missing finally block in handleSearchInvoice in InvoiceScan.jsx"',
       { encoding: 'utf8' }
     );
     console.log(commitOutput);

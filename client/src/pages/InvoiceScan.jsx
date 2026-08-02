@@ -61,6 +61,9 @@ export function InvoiceScan() {
     } catch (err) {
       console.error('Invoice Search Error:', err);
       setSearchError(err.response?.data?.error?.message || 'No invoice found with this number.');
+    } finally {
+      setIsSearchingInvoice(false);
+    }
   };
 
   // Delete Invoice Modal State
