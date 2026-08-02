@@ -22,6 +22,7 @@ const getGenerativeModel = () => {
     generationConfig: {
       responseMimeType: 'application/json',
       temperature: 0.1,
+      maxOutputTokens: 8192,
     },
   });
 };
@@ -87,6 +88,8 @@ Analyze the attached invoice image and extract structured JSON data according to
    - printedGrandTotal: Printed final Net Amount / Total payable figure for the entire invoice (number or null).
 
 2. LINE ITEMS (Medicines & Products Purchased):
+   CRITICAL COMPLETENESS CHECK: Before producing your final JSON output, first visually scan the ENTIRE line-items table region of the invoice from top to bottom and silently count the exact number of distinct product rows present (including rows partially obscured by handwritten tick marks, pen annotations, stamps, or folds — these do not exclude a row, they just make it harder to read). Your "items" array in the output MUST contain exactly that many entries — one per physical row. Never omit a row because it is hard to read; if a specific field on a hard-to-read row is unclear, still include the row and set "confidence": "low" for it rather than dropping it entirely.
+
    - Extract only genuine product purchase lines.
    - EXCLUDE: Distributor address/phone/license boilerplate, disclaimers, buyer address, table header rows, tax/GST summary rows, and amount-in-words lines.
    - For each real product line, extract:
@@ -142,12 +145,12 @@ OUTPUT JSON FORMAT (Strict JSON):
 `;
 
 /**
- * Parses an invoice image buffer using Gemini via Vertex AI.
+ * Internal single extraction attempt using Gemini via Vertex AI.
  * @param {Buffer} fileBuffer - Image buffer
  * @param {string} mimeType - Image mime type (e.g., image/jpeg, image/png)
  * @returns {Promise<Object>} Extracted invoice header & line items
  */
-const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') => {
+const attemptExtraction = async (fileBuffer, mimeType = 'image/jpeg') => {
   try {
     const generativeModel = getGenerativeModel();
 
@@ -167,6 +170,7 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: 0.1,
+        maxOutputTokens: 8192,
       },
     });
 
@@ -276,6 +280,47 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
   } catch (error) {
     console.error('[Gemini OCR Error] Failed to extract invoice with Gemini:', error.message);
     throw error;
+  }
+};
+
+/**
+ * Parses an invoice image buffer using Gemini with auto-retry on suspicious incompleteness.
+ * @param {Buffer} fileBuffer - Image buffer
+ * @param {string} mimeType - Image mime type (e.g., image/jpeg, image/png)
+ * @returns {Promise<Object>} Extracted invoice header & line items
+ */
+const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') => {
+  const firstAttempt = await attemptExtraction(fileBuffer, mimeType);
+
+  const referenceTotal = firstAttempt.printedGrandTotal || firstAttempt.printedSubtotal;
+  const extractedSum = (firstAttempt.items || []).reduce((sum, it) => {
+    const lineVal = it.printedLineTotal || (it.qty * it.purchaseRate) || 0;
+    return sum + lineVal;
+  }, 0);
+
+  const looksIncomplete = referenceTotal && referenceTotal > 0 &&
+    extractedSum < referenceTotal * 0.6; // extracted items cover less than 60% of the invoice's own printed total
+
+  if (!looksIncomplete) {
+    return { ...firstAttempt, ocrRetried: false, possibleMissingItems: false };
+  }
+
+  console.warn('[OCR Completeness Check] First attempt looks incomplete, retrying once...');
+  try {
+    const secondAttempt = await attemptExtraction(fileBuffer, mimeType);
+    const secondSum = (secondAttempt.items || []).reduce((sum, it) => {
+      const lineVal = it.printedLineTotal || (it.qty * it.purchaseRate) || 0;
+      return sum + lineVal;
+    }, 0);
+
+    // Use whichever attempt captured more of the invoice's value
+    if (secondSum > extractedSum) {
+      return { ...secondAttempt, ocrRetried: true, possibleMissingItems: secondSum < referenceTotal * 0.9 };
+    }
+    return { ...firstAttempt, ocrRetried: true, possibleMissingItems: true };
+  } catch (retryErr) {
+    console.warn('[OCR Completeness Check] Retry failed, returning first attempt:', retryErr.message);
+    return { ...firstAttempt, ocrRetried: true, possibleMissingItems: true };
   }
 };
 

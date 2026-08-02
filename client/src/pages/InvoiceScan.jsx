@@ -76,6 +76,7 @@ export function InvoiceScan() {
   const [paymentStatus, setPaymentStatus] = useState('pending');
   const [items, setItems] = useState([]);
   const [rawOcrText, setRawOcrText] = useState('');
+  const [possibleMissingItems, setPossibleMissingItems] = useState(false);
   const [successData, setSuccessData] = useState(null);
 
   // Drag and Drop handlers
@@ -128,6 +129,7 @@ export function InvoiceScan() {
       setPrintedRoundOff(result.printedRoundOff ?? null);
       setPrintedGrandTotal(result.printedGrandTotal ?? null);
       setRawOcrText(result.rawText || '');
+      setPossibleMissingItems(Boolean(result.possibleMissingItems));
 
       const parsedItems = (result.items || []).map((item) => {
         const pTotal = typeof item.printedLineTotal === 'number' && !isNaN(item.printedLineTotal) && item.printedLineTotal > 0
@@ -619,6 +621,18 @@ export function InvoiceScan() {
         {/* STEP 3: REVIEW & EDIT TABLE */}
         {step === 'review' && (
           <form onSubmit={handleConfirmSubmit} className="space-y-6">
+            {possibleMissingItems && (
+              <div className="text-xs font-semibold text-red-800 bg-red-50 border border-red-200 rounded-md px-4 py-3 mb-2 flex items-start gap-2.5">
+                <ShieldAlert className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-red-900">⚠ Possible Missing Line Items Detected</p>
+                  <p className="mt-0.5 text-[11px] text-red-700">
+                    The scanner detected that extracted line items cover much less than the invoice's own printed total (even after a retry). Please manually count the rows on the physical invoice against the table below before confirming, and use "+ Add Line Item" for anything missing.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {errorMsg && (
               <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-3">
                 <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />

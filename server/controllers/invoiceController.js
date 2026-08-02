@@ -92,6 +92,7 @@ const scanInvoice = async (req, res, next) => {
       printedRoundOff: parsedData.printedRoundOff,
       printedGrandTotal: parsedData.printedGrandTotal,
       items: parsedData.items,
+      possibleMissingItems: Boolean(parsedData.possibleMissingItems),
     });
   } catch (error) {
     console.error('[Invoice Gemini Scan Error]', error);

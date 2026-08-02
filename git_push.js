@@ -17,7 +17,7 @@ try {
   console.log('--- Running git commit ---');
   try {
     const commitOutput = execSync(
-      'git commit -m "fix: Show raw invoice-printed rate on Invoice Scan review screen instead of post-discount rate"',
+      'git commit -m "feat: Fix OCR Missing Line Items with auto-retry, maxOutputTokens, and missing items warning banner"',
       { encoding: 'utf8' }
     );
     console.log(commitOutput);
