@@ -17,7 +17,7 @@ try {
   console.log('--- Running git commit ---');
   try {
     const commitOutput = execSync(
-      'git commit -m "style: Make Delete Invoice button solid red for prominent visibility"',
+      'git commit -m "fix: Improve Delete Invoice button placement with dedicated flex layout"',
       { encoding: 'utf8' }
     );
     console.log(commitOutput);

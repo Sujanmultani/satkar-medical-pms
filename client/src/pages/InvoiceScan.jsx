@@ -525,42 +525,43 @@ export function InvoiceScan() {
               {searchInvoiceResults.map((inv) => (
                 <div key={inv._id} className="p-4 rounded-xl bg-teal-50/40 border border-teal-200/80 space-y-3">
                   {/* Header Details */}
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs pb-3 border-b border-teal-200/60 items-center">
-                    <div>
-                      <span className="block text-[10px] uppercase font-mono text-muted">Invoice No</span>
-                      <span className="font-bold font-mono text-primary text-sm">{inv.invoiceNo}</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-teal-200/60">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs flex-1">
+                      <div>
+                        <span className="block text-[10px] uppercase font-mono text-muted">Invoice No</span>
+                        <span className="font-bold font-mono text-primary text-sm">{inv.invoiceNo}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase font-mono text-muted">Supplier</span>
+                        <span className="font-semibold text-gray-900">{inv.supplierName || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase font-mono text-muted">Invoice Date</span>
+                        <span className="font-mono text-gray-800">
+                          {inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase font-mono text-muted">Printed Total</span>
+                        <span className="font-bold font-mono text-teal-800 text-sm">
+                          ₹{(inv.totalAmount || 0).toFixed(2)}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="block text-[10px] uppercase font-mono text-muted">Supplier</span>
-                      <span className="font-semibold text-gray-900">{inv.supplierName || 'N/A'}</span>
-                    </div>
-                    <div>
-                      <span className="block text-[10px] uppercase font-mono text-muted">Invoice Date</span>
-                      <span className="font-mono text-gray-800">
-                        {inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="block text-[10px] uppercase font-mono text-muted">Printed Total</span>
-                      <span className="font-bold font-mono text-teal-800">
-                        ₹{(inv.totalAmount || 0).toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="text-right sm:text-right col-span-2 sm:col-span-1">
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => {
-                          setInvoiceToDelete(inv);
-                          setIsDeleteInvoiceModalOpen(true);
-                        }}
-                        className="h-8 px-3 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold gap-1.5 rounded-lg shadow-sm border border-red-700"
-                        title="Delete Invoice"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-white" />
-                        <span>Delete Invoice</span>
-                      </Button>
-                    </div>
+
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        setInvoiceToDelete(inv);
+                        setIsDeleteInvoiceModalOpen(true);
+                      }}
+                      className="h-8 px-3.5 text-xs bg-red-600 hover:bg-red-700 text-white font-bold gap-1.5 rounded-lg shadow shrink-0 self-start sm:self-center"
+                      title="Delete Invoice"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-white" />
+                      <span>Delete Invoice</span>
+                    </Button>
                   </div>
 
                   {/* Line Items Table */}
