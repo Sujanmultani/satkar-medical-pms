@@ -17,7 +17,7 @@ try {
   console.log('--- Running git commit ---');
   try {
     const commitOutput = execSync(
-      'git commit -m "Fix Vercel API proxy rewrite and fallback URL for DELETE /api/bills/:id"',
+      'git commit -m "Add root vercel.json for Vercel API proxy rewrite"',
       { encoding: 'utf8' }
     );
     console.log(commitOutput);
