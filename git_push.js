@@ -17,7 +17,7 @@ try {
   console.log('--- Running git commit ---');
   try {
     const commitOutput = execSync(
-      'git commit -m "Add scanned invoice search by number and medicine shelf/counter location tracking"',
+      'git commit -m "Add Free Quantity (FQTY/Scheme Qty) capture to invoice OCR scan and batch stock tracking"',
       { encoding: 'utf8' }
     );
     console.log(commitOutput);

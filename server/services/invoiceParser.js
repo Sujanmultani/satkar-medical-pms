@@ -98,6 +98,7 @@ Analyze the attached invoice image and extract structured JSON data according to
      - batchNo: Batch alphanumeric code (e.g., "BRND01", "D1362107", "CA1S15", "1TX2501").
      - expiryDate: Expiry date as YYYY-MM-DD (convert bare MM/YY or MM/YYYY to last day of month).
      - qty: Number of packs/units actually billed and purchased on this line (integer, default 1).
+     - freeQty: Some invoice lines include a separate 'Free Qty' / 'FQTY' / 'FR.QTY' / 'Free' / 'Scheme Qty' column, representing bonus units supplied at no additional cost, distinct from the billed/paid quantity (which stays in the existing `qty` field). Extract this as `freeQty` if present; default to 0 if the invoice has no such column for that line.
      - purchaseRate: Net effective purchase rate per unit POST-DISCOUNT (number).
        * IMPORTANT DISCOUNT & RATE GUIDANCE: Indian pharma distributor invoices often show a discount or scheme percentage (labeled 'S+C%', 'Disc%', 'INDIS', 'Scheme%', or similar) that reduces the base amount used for GST calculation. When such a column exists, purchaseRate MUST reflect the rate AFTER this discount is applied, not the raw listed trade rate.
        * ALWAYS ATTEMPT EXTRACTION OF printedLineTotal: If a printed line total (printedLineTotal / TOT.AMT / Line Amount) is visible and legible for a row, extract it. If raw trade rate vs post-discount rate is ambiguous, prioritize deriving purchaseRate by working backward from printedLineTotal: purchaseRate = (printedLineTotal / (1 + gstPercent/100)) / qty.
@@ -128,6 +129,7 @@ OUTPUT JSON FORMAT (Strict JSON):
       "batchNo": "String",
       "expiryDate": "YYYY-MM-DD",
       "qty": 1,
+      "freeQty": 0,
       "purchaseRate": 0.0,
       "mrp": 0.0,
       "gstPercent": null,
@@ -182,6 +184,7 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
     // Post-process and normalize fields
     const rawItems = (parsedData.items || []).map((item) => {
       const parsedQty = typeof item.qty === 'number' && !isNaN(item.qty) ? item.qty : parseInt(item.qty, 10);
+      const parsedFreeQty = typeof item.freeQty === 'number' && !isNaN(item.freeQty) ? item.freeQty : parseInt(item.freeQty, 10);
       const parsedRate = typeof item.purchaseRate === 'number' && !isNaN(item.purchaseRate) ? item.purchaseRate : parseFloat(item.purchaseRate);
       const parsedMrp = typeof item.mrp === 'number' && !isNaN(item.mrp) ? item.mrp : parseFloat(item.mrp);
       const parsedGst = typeof item.gstPercent === 'number' && !isNaN(item.gstPercent) ? item.gstPercent : parseFloat(item.gstPercent);
@@ -207,6 +210,7 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
         batchNo: item.batchNo ? String(item.batchNo).trim() : `B-${Date.now().toString().slice(-4)}`,
         expiryDate: item.expiryDate ? parseExpiryDate(item.expiryDate) || item.expiryDate : null,
         qty: !isNaN(parsedQty) && parsedQty > 0 ? parsedQty : 1,
+        freeQty: !isNaN(parsedFreeQty) && parsedFreeQty >= 0 ? parsedFreeQty : 0,
         purchaseRate: !isNaN(parsedRate) && parsedRate >= 0 ? parsedRate : 0,
         mrp: !isNaN(parsedMrp) && parsedMrp >= 0 ? parsedMrp : 0,
         gstPercent: hasValidGst ? parsedGst : null,
@@ -239,8 +243,9 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
         if (!existing.hsnCode && item.hsnCode) {
           existing.hsnCode = item.hsnCode;
         }
-        // Retain max qty & mrp
+        // Retain max qty & mrp, and sum freeQty
         existing.qty = Math.max(existing.qty, item.qty);
+        existing.freeQty = Math.max(existing.freeQty, item.freeQty);
         existing.mrp = Math.max(existing.mrp, item.mrp);
         // Assign low confidence so human admin double-checks during confirmation
         existing.confidence = 'low';

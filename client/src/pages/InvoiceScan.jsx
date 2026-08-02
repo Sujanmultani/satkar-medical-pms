@@ -224,6 +224,7 @@ export function InvoiceScan() {
         batchNo: '',
         expiryDate: '',
         qty: 10,
+        freeQty: 0,
         purchaseRate: 0,
         mrp: 0,
         gstPercent: 0,
@@ -517,6 +518,7 @@ export function InvoiceScan() {
                           const batchNo = batch.batchNo || ext.batchNo || 'N/A';
                           const expiry = batch.expiryDate || ext.expiryDate;
                           const qty = batch.initialQty !== undefined ? batch.initialQty : ext.qty;
+                          const freeQty = batch.freeQty !== undefined ? batch.freeQty : (ext.freeQty || 0);
                           const pRate = batch.purchaseRate !== undefined ? batch.purchaseRate : ext.purchaseRate;
                           const mrp = batch.mrp !== undefined ? batch.mrp : ext.mrp;
                           const gst = batch.gstPercent !== undefined ? batch.gstPercent : ext.gstPercent;
@@ -538,7 +540,10 @@ export function InvoiceScan() {
                               <td className="py-2 px-3 font-mono text-gray-700 text-[11px]">
                                 {expiry ? new Date(expiry).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : 'N/A'}
                               </td>
-                              <td className="py-2 px-2 text-center font-mono font-bold text-primary">{qty}</td>
+                              <td className="py-2 px-2 text-center font-mono font-bold text-primary">
+                                <span>{qty}</span>
+                                {freeQty > 0 && <span className="text-teal-700 text-[10px] font-semibold block">(+{freeQty} Free)</span>}
+                              </td>
                               <td className="py-2 px-2 text-right font-mono">₹{Number(pRate || 0).toFixed(2)}</td>
                               <td className="py-2 px-2 text-right font-mono">₹{Number(mrp || 0).toFixed(2)}</td>
                               <td className="py-2 px-2 text-center font-mono">{gst}%</td>
@@ -737,6 +742,7 @@ export function InvoiceScan() {
                       <th className="py-2.5 px-3 min-w-[130px] w-36">Batch No *</th>
                       <th className="py-2.5 px-3 min-w-[140px] w-36">Expiry Date {storeType === 'medical' ? '*' : ''}</th>
                       <th className="py-2.5 px-2 text-center min-w-[80px] w-20">Qty *</th>
+                      <th className="py-2.5 px-2 text-center min-w-[80px] w-20">Free Qty</th>
                       <th className="py-2.5 px-2 text-right min-w-[100px] w-28">P.Rate (₹)</th>
                       <th className="py-2.5 px-2 text-right min-w-[100px] w-28">MRP (₹)</th>
                       <th className="py-2.5 px-2 text-center min-w-[110px] w-28">GST %</th>
@@ -852,6 +858,18 @@ export function InvoiceScan() {
                               value={item.qty !== undefined && item.qty !== null ? item.qty : ''}
                               onChange={(e) => handleItemChange(idx, 'qty', e.target.value)}
                               className="h-8 text-xs font-mono text-center font-bold w-full min-w-[65px]"
+                            />
+                          </td>
+
+                          {/* Free Qty */}
+                          <td className="py-2 px-2 min-w-[80px]">
+                            <Input
+                              type="number"
+                              min="0"
+                              value={item.freeQty !== undefined && item.freeQty !== null ? item.freeQty : 0}
+                              onChange={(e) => handleItemChange(idx, 'freeQty', e.target.value)}
+                              placeholder="0"
+                              className="h-8 text-xs font-mono text-center font-semibold text-teal-800 bg-teal-50/50 border-teal-200 w-full min-w-[65px]"
                             />
                           </td>
 

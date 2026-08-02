@@ -142,7 +142,7 @@ const confirmInvoice = async (req, res, next) => {
     const store = ['medical', 'provision'].includes(storeType) ? storeType : 'medical';
 
     for (const lineItem of items) {
-      const { name, composition, category, unit, hsnCode, location, batchNo, expiryDate, qty, purchaseRate, mrp, gstPercent } = lineItem;
+      const { name, composition, category, unit, hsnCode, location, batchNo, expiryDate, qty, freeQty, purchaseRate, mrp, gstPercent } = lineItem;
 
       if (!name || !name.trim()) continue;
       if (!batchNo || !batchNo.trim()) continue;
@@ -189,6 +189,7 @@ const confirmInvoice = async (req, res, next) => {
       }
 
       const numQty = Math.max(0, Number(qty) || 0);
+      const numFreeQty = Math.max(0, Number(freeQty) || 0);
       const numPurchaseRate = Math.max(0, Number(purchaseRate) || 0);
       const numMrp = Math.max(0, Number(mrp) || 0);
       const numGstPercent = Math.max(0, Number(gstPercent) || 0);
@@ -198,7 +199,7 @@ const confirmInvoice = async (req, res, next) => {
       const lineBase = roundMoney(numQty * numPurchaseRate);
       const lineGst = roundMoney((lineBase * numGstPercent) / 100);
 
-      // Create Batch
+      // Create Batch (physical stock includes paid + free units; cost uses paid qty only)
       const batch = await Batch.create({
         itemId: item._id,
         supplierId: supplierRecord ? supplierRecord._id : undefined,
@@ -206,8 +207,9 @@ const confirmInvoice = async (req, res, next) => {
         mfgDate: lineItem.mfgDate ? new Date(lineItem.mfgDate) : null,
         expiryDate: batchExpiry,
         receivedDate: invoiceDate ? new Date(invoiceDate) : new Date(),
-        qty: numQty,
-        initialQty: numQty,
+        qty: numQty + numFreeQty,
+        initialQty: numQty + numFreeQty,
+        freeQty: numFreeQty,
         purchaseRate: numPurchaseRate,
         mrp: numMrp,
         gstPercent: numGstPercent,
