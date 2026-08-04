@@ -96,6 +96,17 @@ const scanInvoice = async (req, res, next) => {
     });
   } catch (error) {
     console.error('[Invoice Gemini Scan Error]', error);
+
+    const isRateLimit = error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED') || error.code === 429;
+    if (isRateLimit) {
+      return res.status(429).json({
+        error: {
+          code: 'GEMINI_RATE_LIMIT_EXHAUSTED',
+          message: 'Google AI scanner is temporarily busy (429 Rate Limit). Please wait 10-15 seconds and try scanning again.',
+        },
+      });
+    }
+
     return res.status(500).json({
       error: {
         code: 'OCR_SCAN_FAILED',

@@ -5,19 +5,20 @@
 
 const { VertexAI } = require('@google-cloud/vertexai');
 
-let vertexAIClient = null;
+const clientMap = new Map();
 
-const getGenerativeModel = () => {
-  if (!vertexAIClient) {
-    const project = process.env.GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || 'satkar-medical-ocr';
-    const location = process.env.GCP_LOCATION || 'us-central1';
+const getGenerativeModel = (locationOverride) => {
+  const project = process.env.GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || 'satkar-medical-ocr';
+  const location = locationOverride || process.env.GCP_LOCATION || 'us-central1';
 
-    vertexAIClient = new VertexAI({ project, location });
+  if (!clientMap.has(location)) {
+    clientMap.set(location, new VertexAI({ project, location }));
   }
 
-  // Use Gemini multimodal model (gemini-2.5-flash)
+  const vertexClient = clientMap.get(location);
   const modelName = process.env.GEMINI_MODEL_NAME || 'gemini-2.5-flash';
-  return vertexAIClient.getGenerativeModel({
+
+  return vertexClient.getGenerativeModel({
     model: modelName,
     generationConfig: {
       responseMimeType: 'application/json',
@@ -59,17 +60,13 @@ function parseExpiryDate(dateStr) {
     }
   }
 
-  // Pattern DD/MM/YYYY or DD/MM/YY
-  const ddmmyyMatch = cleaned.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/);
-  if (ddmmyyMatch) {
-    const day = parseInt(ddmmyyMatch[1], 10);
-    const month = parseInt(ddmmyyMatch[2], 10) - 1;
-    let year = parseInt(ddmmyyMatch[3], 10);
-    if (year < 100) year += 2000;
-    const date = new Date(year, month, day);
-    if (!isNaN(date.getTime())) {
-      return date.toISOString().split('T')[0];
-    }
+  // Pattern DD/MM/YYYY or DD-MM-YYYY
+  const ddmmyyyyMatch = cleaned.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
+  if (ddmmyyyyMatch) {
+    const day = ddmmyyyyMatch[1].padStart(2, '0');
+    const month = ddmmyyyyMatch[2].padStart(2, '0');
+    const year = ddmmyyyyMatch[3];
+    return `${year}-${month}-${day}`;
   }
 
   return null;
@@ -88,8 +85,6 @@ Analyze the attached invoice image and extract structured JSON data according to
    - printedGrandTotal: Printed final Net Amount / Total payable figure for the entire invoice (number or null).
 
 2. LINE ITEMS (Medicines & Products Purchased):
-   CRITICAL COMPLETENESS CHECK: Before producing your final JSON output, first visually scan the ENTIRE line-items table region of the invoice from top to bottom and silently count the exact number of distinct product rows present (including rows partially obscured by handwritten tick marks, pen annotations, stamps, or folds — these do not exclude a row, they just make it harder to read). Your "items" array in the output MUST contain exactly that many entries — one per physical row. Never omit a row because it is hard to read; if a specific field on a hard-to-read row is unclear, still include the row and set "confidence": "low" for it rather than dropping it entirely.
-
    - Extract only genuine product purchase lines.
    - EXCLUDE: Distributor address/phone/license boilerplate, disclaimers, buyer address, table header rows, tax/GST summary rows, and amount-in-words lines.
    - For each real product line, extract:
@@ -101,16 +96,20 @@ Analyze the attached invoice image and extract structured JSON data according to
      - batchNo: Batch alphanumeric code (e.g., "BRND01", "D1362107", "CA1S15", "1TX2501").
      - expiryDate: Expiry date as YYYY-MM-DD (convert bare MM/YY or MM/YYYY to last day of month).
      - qty: Number of packs/units actually billed and purchased on this line (integer, default 1).
-     - freeQty: Some invoice lines include a separate 'Free Qty' / 'FQTY' / 'FR.QTY' / 'Free' / 'Scheme Qty' column, representing bonus units supplied at no additional cost, distinct from the billed/paid quantity (which stays in the existing 'qty' field). Extract this as 'freeQty' if present; default to 0 if the invoice has no such column for that line.
-     - purchaseRate: The RAW rate per unit EXACTLY AS PRINTED in the invoice's own "Rate" column for this line — the number a human would read directly off the paper, BEFORE any discount or scheme deduction is applied. Do NOT apply any discount adjustment to this number yourself.
-     - discPercent: If the invoice shows a discount or scheme percentage column for this line (labeled 'S+C%', 'Disc%', 'INDIS', 'Scheme%', or similar), extract the exact printed percentage value (number). Default to 0 if no such column exists or is blank for this line.
-     - ALWAYS ATTEMPT EXTRACTION OF printedLineTotal: If a printed line total (printedLineTotal / TOT.AMT / Line Amount) is visible and legible for a row, extract it. This remains the primary source of truth for the line's total — it is independent of purchaseRate and discPercent above.
+     - purchaseRate: Net effective purchase rate per unit POST-DISCOUNT (number).
+       * IMPORTANT DISCOUNT & RATE GUIDANCE: Indian pharma distributor invoices often show a discount or scheme percentage (labeled 'S+C%', 'Disc%', 'INDIS', 'Scheme%', or similar) that reduces the base amount used for GST calculation. When such a column exists, purchaseRate MUST reflect the rate AFTER this discount is applied, not the raw listed trade rate.
+       * ALWAYS ATTEMPT EXTRACTION OF printedLineTotal: If a printed line total (printedLineTotal / TOT.AMT / Line Amount) is visible and legible for a row, extract it. If raw trade rate vs post-discount rate is ambiguous, prioritize deriving purchaseRate by working backward from printedLineTotal: purchaseRate = (printedLineTotal / (1 + gstPercent/100)) / qty.
      - mrp: Maximum Retail Price per pack (number).
      - gstPercent: Read the EXACT GST/tax percentage printed for THIS SPECIFIC line item (number).
      - printedLineTotal: Printed final line item amount figure if printed on this line (number or null). ALWAYS ATTEMPT TO EXTRACT THIS FIELD FOR EVERY LINE ITEM.
      - confidence: "high" if legible; set to "low" if ambiguous.
 
-3. STRICT DUPLICATE PREVENTION & MERGING RULES:
+3. MULTI-PAGE INVOICES (When multiple image pages are attached):
+   - Page 1 contains the main Supplier Name, Invoice Number, and Invoice Date.
+   - Combine ALL product line items from ALL attached pages in sequential order into a single unified "items" array.
+   - Extract printedSubtotal, printedRoundOff, and printedGrandTotal from the final summary / bottom footer of the invoice (usually on the last page).
+
+4. STRICT DUPLICATE PREVENTION & MERGING RULES:
    - Each physical purchase line item on the invoice must appear EXACTLY ONCE in the JSON output array.
    - Merge lines sharing identical batch number and rate/MRP.
 
@@ -132,9 +131,7 @@ OUTPUT JSON FORMAT (Strict JSON):
       "batchNo": "String",
       "expiryDate": "YYYY-MM-DD",
       "qty": 1,
-      "freeQty": 0,
       "purchaseRate": 0.0,
-      "discPercent": 0.0,
       "mrp": 0.0,
       "gstPercent": null,
       "printedLineTotal": null,
@@ -145,119 +142,131 @@ OUTPUT JSON FORMAT (Strict JSON):
 `;
 
 /**
- * Internal single extraction attempt using Gemini via Vertex AI.
+ * Internal single extraction attempt using Gemini via Vertex AI with multi-region fallback.
  * @param {Buffer|Array<Object>} inputData - Image buffer or array of { buffer, mimeType }
  * @param {string} mimeType - Image mime type
  * @returns {Promise<Object>} Extracted invoice header & line items
  */
 const attemptExtraction = async (inputData, mimeType = 'image/jpeg') => {
-  try {
-    const generativeModel = getGenerativeModel();
+  const locations = ['us-central1', 'us-east4', 'us-west1', 'europe-west1'];
+  let lastError = null;
 
-    const pageArray = Array.isArray(inputData)
-      ? inputData
-      : [{ buffer: inputData, mimeType: mimeType || 'image/jpeg' }];
+  const pageArray = Array.isArray(inputData)
+    ? inputData
+    : [{ buffer: inputData, mimeType: mimeType || 'image/jpeg' }];
 
-    const imageParts = pageArray.map((page) => ({
-      inlineData: {
-        data: page.buffer.toString('base64'),
-        mimeType: page.mimeType || 'image/jpeg',
-      },
-    }));
+  const imageParts = pageArray.map((page) => ({
+    inlineData: {
+      data: page.buffer.toString('base64'),
+      mimeType: page.mimeType || 'image/jpeg',
+    },
+  }));
 
-    const textPart = {
-      text: EXTRACTION_PROMPT,
-    };
+  const textPart = {
+    text: EXTRACTION_PROMPT,
+  };
 
-    const response = await generativeModel.generateContent({
-      contents: [{ role: 'user', parts: [...imageParts, textPart] }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.1,
-        maxOutputTokens: 8192,
-      },
-    });
+  for (let i = 0; i < locations.length; i++) {
+    const loc = locations[i];
+    try {
+      const generativeModel = getGenerativeModel(loc);
 
-    const candidate = response?.response?.candidates?.[0];
-    const textOutput = candidate?.content?.parts?.[0]?.text;
+      const response = await generativeModel.generateContent({
+        contents: [{ role: 'user', parts: [...imageParts, textPart] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.1,
+          maxOutputTokens: 8192,
+        },
+      });
 
-    if (!textOutput) {
-      throw new Error('Gemini API returned an empty response.');
-    }
+      const candidate = response?.response?.candidates?.[0];
+      const textOutput = candidate?.content?.parts?.[0]?.text;
 
-    const parsedData = JSON.parse(textOutput);
+      if (!textOutput) {
+        throw new Error('Gemini API returned an empty response.');
+      }
 
-    const validCategories = ['Tablet', 'Syrup', 'Capsule', 'Injection', 'Insulin', 'Ointment', 'Drops', 'Other'];
-    const validUnits = ['strip', 'bottle', 'vial', 'tube', 'pack', 'piece'];
+      const parsedData = JSON.parse(textOutput);
 
-    // Post-process and normalize fields
-    const rawItems = (parsedData.items || []).map((item) => {
-      const parsedQty = typeof item.qty === 'number' && !isNaN(item.qty) ? item.qty : parseInt(item.qty, 10);
-      const parsedFreeQty = typeof item.freeQty === 'number' && !isNaN(item.freeQty) ? item.freeQty : parseInt(item.freeQty, 10);
-      const parsedRate = typeof item.purchaseRate === 'number' && !isNaN(item.purchaseRate) ? item.purchaseRate : parseFloat(item.purchaseRate);
-      const parsedDiscPercent = typeof item.discPercent === 'number' && !isNaN(item.discPercent) ? item.discPercent : parseFloat(item.discPercent);
-      const parsedMrp = typeof item.mrp === 'number' && !isNaN(item.mrp) ? item.mrp : parseFloat(item.mrp);
-      const parsedGst = typeof item.gstPercent === 'number' && !isNaN(item.gstPercent) ? item.gstPercent : parseFloat(item.gstPercent);
-      const parsedLineTotal = typeof item.printedLineTotal === 'number' && !isNaN(item.printedLineTotal) ? item.printedLineTotal : parseFloat(item.printedLineTotal);
+      const validCategories = ['Tablet', 'Syrup', 'Capsule', 'Injection', 'Insulin', 'Ointment', 'Drops', 'Other'];
+      const validUnits = ['strip', 'bottle', 'vial', 'tube', 'pack', 'piece'];
+
+      // Post-process and normalize fields
+      const rawItems = (parsedData.items || []).map((item) => {
+        const parsedQty = typeof item.qty === 'number' && !isNaN(item.qty) ? item.qty : parseInt(item.qty, 10);
+        const parsedRate = typeof item.purchaseRate === 'number' && !isNaN(item.purchaseRate) ? item.purchaseRate : parseFloat(item.purchaseRate);
+        const parsedMrp = typeof item.mrp === 'number' && !isNaN(item.mrp) ? item.mrp : parseFloat(item.mrp);
+        const parsedGst = typeof item.gstPercent === 'number' && !isNaN(item.gstPercent) ? item.gstPercent : parseFloat(item.gstPercent);
+        const parsedLineTotal = typeof item.printedLineTotal === 'number' && !isNaN(item.printedLineTotal) ? item.printedLineTotal : parseFloat(item.printedLineTotal);
+
+        return {
+          name: item.name ? String(item.name).trim() : 'Unspecified Medicine',
+          composition: item.composition ? String(item.composition).trim() : null,
+          category: validCategories.includes(item.category) ? item.category : 'Tablet',
+          unit: validUnits.includes(item.unit) ? item.unit : 'strip',
+          hsnCode: item.hsnCode ? String(item.hsnCode).trim() : null,
+          batchNo: item.batchNo ? String(item.batchNo).trim() : 'NO-BATCH',
+          expiryDate: parseExpiryDate(item.expiryDate) || item.expiryDate || null,
+          qty: !isNaN(parsedQty) && parsedQty > 0 ? parsedQty : 1,
+          purchaseRate: !isNaN(parsedRate) && parsedRate >= 0 ? parsedRate : 0,
+          mrp: !isNaN(parsedMrp) && parsedMrp >= 0 ? parsedMrp : 0,
+          gstPercent: !isNaN(parsedGst) && parsedGst >= 0 ? parsedGst : 12,
+          printedLineTotal: !isNaN(parsedLineTotal) && parsedLineTotal > 0 ? parsedLineTotal : null,
+          confidence: item.confidence === 'low' ? 'low' : 'high',
+        };
+      });
+
+      // Deduplicate/merge items sharing exact same batch and price
+      const seenMap = new Map();
+      const items = [];
+
+      for (const item of rawItems) {
+        const normalizedBatch = item.batchNo ? item.batchNo.trim().toUpperCase() : '';
+        const dedupKey = `${item.name.toUpperCase()}_${normalizedBatch}_${item.purchaseRate}_${item.mrp}`;
+
+        if (normalizedBatch && seenMap.has(dedupKey)) {
+          const existingIndex = seenMap.get(dedupKey);
+          const existing = items[existingIndex];
+          existing.qty = Math.max(existing.qty, item.qty);
+          existing.mrp = Math.max(existing.mrp, item.mrp);
+          existing.confidence = 'low';
+        } else {
+          if (normalizedBatch) {
+            seenMap.set(dedupKey, items.length);
+          }
+          items.push({ ...item });
+        }
+      }
+
+      const pSub = typeof parsedData.printedSubtotal === 'number' && !isNaN(parsedData.printedSubtotal) ? parsedData.printedSubtotal : parseFloat(parsedData.printedSubtotal);
+      const pRound = typeof parsedData.printedRoundOff === 'number' && !isNaN(parsedData.printedRoundOff) ? parsedData.printedRoundOff : parseFloat(parsedData.printedRoundOff);
+      const pGrand = typeof parsedData.printedGrandTotal === 'number' && !isNaN(parsedData.printedGrandTotal) ? parsedData.printedGrandTotal : parseFloat(parsedData.printedGrandTotal);
 
       return {
-        name: item.name ? String(item.name).trim() : 'Unspecified Medicine',
-        composition: item.composition ? String(item.composition).trim() : null,
-        category: validCategories.includes(item.category) ? item.category : 'Tablet',
-        unit: validUnits.includes(item.unit) ? item.unit : 'strip',
-        hsnCode: item.hsnCode ? String(item.hsnCode).trim() : null,
-        batchNo: item.batchNo ? String(item.batchNo).trim() : 'NO-BATCH',
-        expiryDate: parseExpiryDate(item.expiryDate) || item.expiryDate || null,
-        qty: !isNaN(parsedQty) && parsedQty > 0 ? parsedQty : 1,
-        freeQty: !isNaN(parsedFreeQty) && parsedFreeQty >= 0 ? parsedFreeQty : 0,
-        purchaseRate: !isNaN(parsedRate) && parsedRate >= 0 ? parsedRate : 0,
-        discPercent: !isNaN(parsedDiscPercent) && parsedDiscPercent >= 0 ? parsedDiscPercent : 0,
-        mrp: !isNaN(parsedMrp) && parsedMrp >= 0 ? parsedMrp : 0,
-        gstPercent: !isNaN(parsedGst) && parsedGst >= 0 ? parsedGst : 12,
-        printedLineTotal: !isNaN(parsedLineTotal) && parsedLineTotal > 0 ? parsedLineTotal : null,
-        confidence: item.confidence === 'low' ? 'low' : 'high',
+        supplierName: parsedData.supplierName ? String(parsedData.supplierName).trim() : 'Pharma Distributor',
+        invoiceNo: parsedData.invoiceNo ? String(parsedData.invoiceNo).trim() : `INV-${Date.now().toString().slice(-6)}`,
+        invoiceDate: parseExpiryDate(parsedData.invoiceDate) || parsedData.invoiceDate || new Date().toISOString().split('T')[0],
+        printedSubtotal: !isNaN(pSub) ? pSub : null,
+        printedRoundOff: !isNaN(pRound) ? pRound : null,
+        printedGrandTotal: !isNaN(pGrand) ? pGrand : null,
+        items,
       };
-    });
+    } catch (err) {
+      lastError = err;
+      const is429 = err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED') || err.code === 429 || err.status === 'RESOURCE_EXHAUSTED';
 
-    // Deduplicate/merge items sharing exact same batch and price
-    const seenMap = new Map();
-    const items = [];
-
-    for (const item of rawItems) {
-      const normalizedBatch = item.batchNo ? item.batchNo.trim().toUpperCase() : '';
-      const dedupKey = `${item.name.toUpperCase()}_${normalizedBatch}_${item.purchaseRate}_${item.mrp}`;
-
-      if (normalizedBatch && seenMap.has(dedupKey)) {
-        const existingIndex = seenMap.get(dedupKey);
-        const existing = items[existingIndex];
-        existing.qty = Math.max(existing.qty, item.qty);
-        existing.mrp = Math.max(existing.mrp, item.mrp);
-        existing.confidence = 'low';
-      } else {
-        if (normalizedBatch) {
-          seenMap.set(dedupKey, items.length);
-        }
-        items.push({ ...item });
+      if (is429 && i < locations.length - 1) {
+        console.warn(`[Gemini OCR 429 Rate Limit] Region ${loc} rate limited. Retrying with fallback region ${locations[i + 1]} in 1.5s...`);
+        await new Promise((res) => setTimeout(res, 1500));
+        continue;
       }
+
+      throw err;
     }
-
-    const pSub = typeof parsedData.printedSubtotal === 'number' && !isNaN(parsedData.printedSubtotal) ? parsedData.printedSubtotal : parseFloat(parsedData.printedSubtotal);
-    const pRound = typeof parsedData.printedRoundOff === 'number' && !isNaN(parsedData.printedRoundOff) ? parsedData.printedRoundOff : parseFloat(parsedData.printedRoundOff);
-    const pGrand = typeof parsedData.printedGrandTotal === 'number' && !isNaN(parsedData.printedGrandTotal) ? parsedData.printedGrandTotal : parseFloat(parsedData.printedGrandTotal);
-
-    return {
-      supplierName: parsedData.supplierName ? String(parsedData.supplierName).trim() : 'Pharma Distributor',
-      invoiceNo: parsedData.invoiceNo ? String(parsedData.invoiceNo).trim() : `INV-${Date.now().toString().slice(-6)}`,
-      invoiceDate: parseExpiryDate(parsedData.invoiceDate) || parsedData.invoiceDate || new Date().toISOString().split('T')[0],
-      printedSubtotal: !isNaN(pSub) ? pSub : null,
-      printedRoundOff: !isNaN(pRound) ? pRound : null,
-      printedGrandTotal: !isNaN(pGrand) ? pGrand : null,
-      items,
-    };
-  } catch (error) {
-    console.error('[Gemini OCR Error] Failed to extract invoice with Gemini:', error.message);
-    throw error;
   }
+
+  throw lastError;
 };
 
 /**
