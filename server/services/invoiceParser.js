@@ -146,27 +146,31 @@ OUTPUT JSON FORMAT (Strict JSON):
 
 /**
  * Internal single extraction attempt using Gemini via Vertex AI.
- * @param {Buffer} fileBuffer - Image buffer
- * @param {string} mimeType - Image mime type (e.g., image/jpeg, image/png)
+ * @param {Buffer|Array<Object>} inputData - Image buffer or array of { buffer, mimeType }
+ * @param {string} mimeType - Image mime type
  * @returns {Promise<Object>} Extracted invoice header & line items
  */
-const attemptExtraction = async (fileBuffer, mimeType = 'image/jpeg') => {
+const attemptExtraction = async (inputData, mimeType = 'image/jpeg') => {
   try {
     const generativeModel = getGenerativeModel();
 
-    const imagePart = {
+    const pageArray = Array.isArray(inputData)
+      ? inputData
+      : [{ buffer: inputData, mimeType: mimeType || 'image/jpeg' }];
+
+    const imageParts = pageArray.map((page) => ({
       inlineData: {
-        data: fileBuffer.toString('base64'),
-        mimeType,
+        data: page.buffer.toString('base64'),
+        mimeType: page.mimeType || 'image/jpeg',
       },
-    };
+    }));
 
     const textPart = {
       text: EXTRACTION_PROMPT,
     };
 
     const response = await generativeModel.generateContent({
-      contents: [{ role: 'user', parts: [imagePart, textPart] }],
+      contents: [{ role: 'user', parts: [...imageParts, textPart] }],
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: 0.1,
@@ -194,67 +198,40 @@ const attemptExtraction = async (fileBuffer, mimeType = 'image/jpeg') => {
       const parsedDiscPercent = typeof item.discPercent === 'number' && !isNaN(item.discPercent) ? item.discPercent : parseFloat(item.discPercent);
       const parsedMrp = typeof item.mrp === 'number' && !isNaN(item.mrp) ? item.mrp : parseFloat(item.mrp);
       const parsedGst = typeof item.gstPercent === 'number' && !isNaN(item.gstPercent) ? item.gstPercent : parseFloat(item.gstPercent);
-      const parsedPrintedTotal = typeof item.printedLineTotal === 'number' && !isNaN(item.printedLineTotal) ? item.printedLineTotal : parseFloat(item.printedLineTotal);
-      const hasValidGst = !isNaN(parsedGst) && parsedGst >= 0;
-
-      let cat = item.category ? String(item.category).trim() : '';
-      if (!validCategories.includes(cat)) {
-        cat = 'Tablet';
-      }
-
-      let u = item.unit ? String(item.unit).trim() : '';
-      if (!validUnits.includes(u)) {
-        u = 'strip';
-      }
+      const parsedLineTotal = typeof item.printedLineTotal === 'number' && !isNaN(item.printedLineTotal) ? item.printedLineTotal : parseFloat(item.printedLineTotal);
 
       return {
-        name: item.name ? String(item.name).trim() : 'Unknown Product',
-        composition: item.composition ? String(item.composition).trim() : '',
-        category: cat,
-        unit: u,
-        hsnCode: item.hsnCode ? String(item.hsnCode).trim() : '',
-        batchNo: item.batchNo ? String(item.batchNo).trim() : `B-${Date.now().toString().slice(-4)}`,
-        expiryDate: item.expiryDate ? parseExpiryDate(item.expiryDate) || item.expiryDate : null,
+        name: item.name ? String(item.name).trim() : 'Unspecified Medicine',
+        composition: item.composition ? String(item.composition).trim() : null,
+        category: validCategories.includes(item.category) ? item.category : 'Tablet',
+        unit: validUnits.includes(item.unit) ? item.unit : 'strip',
+        hsnCode: item.hsnCode ? String(item.hsnCode).trim() : null,
+        batchNo: item.batchNo ? String(item.batchNo).trim() : 'NO-BATCH',
+        expiryDate: parseExpiryDate(item.expiryDate) || item.expiryDate || null,
         qty: !isNaN(parsedQty) && parsedQty > 0 ? parsedQty : 1,
         freeQty: !isNaN(parsedFreeQty) && parsedFreeQty >= 0 ? parsedFreeQty : 0,
         purchaseRate: !isNaN(parsedRate) && parsedRate >= 0 ? parsedRate : 0,
         discPercent: !isNaN(parsedDiscPercent) && parsedDiscPercent >= 0 ? parsedDiscPercent : 0,
         mrp: !isNaN(parsedMrp) && parsedMrp >= 0 ? parsedMrp : 0,
-        gstPercent: hasValidGst ? parsedGst : null,
-        printedLineTotal: !isNaN(parsedPrintedTotal) && parsedPrintedTotal > 0 ? parsedPrintedTotal : null,
-        confidence: (!hasValidGst || item.confidence === 'low') ? 'low' : 'high',
+        gstPercent: !isNaN(parsedGst) && parsedGst >= 0 ? parsedGst : 12,
+        printedLineTotal: !isNaN(parsedLineTotal) && parsedLineTotal > 0 ? parsedLineTotal : null,
+        confidence: item.confidence === 'low' ? 'low' : 'high',
       };
     });
 
-    // Server-side De-duplication Safety Net:
-    // Merge items sharing identical batchNo AND purchaseRate
-    const items = [];
+    // Deduplicate/merge items sharing exact same batch and price
     const seenMap = new Map();
+    const items = [];
 
     for (const item of rawItems) {
-      const normalizedBatch = item.batchNo.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const dedupKey = `${normalizedBatch}_${item.purchaseRate.toFixed(2)}`;
+      const normalizedBatch = item.batchNo ? item.batchNo.trim().toUpperCase() : '';
+      const dedupKey = `${item.name.toUpperCase()}_${normalizedBatch}_${item.purchaseRate}_${item.mrp}`;
 
       if (normalizedBatch && seenMap.has(dedupKey)) {
-        const existingIdx = seenMap.get(dedupKey);
-        const existing = items[existingIdx];
-
-        // Merge: keep longer/more complete product name
-        if (item.name.length > existing.name.length) {
-          existing.name = item.name;
-        }
-        // Keep non-empty composition / hsnCode if available
-        if (!existing.composition && item.composition) {
-          existing.composition = item.composition;
-        }
-        if (!existing.hsnCode && item.hsnCode) {
-          existing.hsnCode = item.hsnCode;
-        }
-        // Retain max qty & mrp, and sum freeQty
+        const existingIndex = seenMap.get(dedupKey);
+        const existing = items[existingIndex];
         existing.qty = Math.max(existing.qty, item.qty);
-        existing.freeQty = Math.max(existing.freeQty, item.freeQty);
         existing.mrp = Math.max(existing.mrp, item.mrp);
-        // Assign low confidence so human admin double-checks during confirmation
         existing.confidence = 'low';
       } else {
         if (normalizedBatch) {
@@ -284,13 +261,13 @@ const attemptExtraction = async (fileBuffer, mimeType = 'image/jpeg') => {
 };
 
 /**
- * Parses an invoice image buffer using Gemini with auto-retry on suspicious incompleteness.
- * @param {Buffer} fileBuffer - Image buffer
- * @param {string} mimeType - Image mime type (e.g., image/jpeg, image/png)
+ * Parses invoice image buffer(s) using Gemini with auto-retry on suspicious incompleteness.
+ * @param {Buffer|Array<Object>} inputData - Image buffer or array of { buffer, mimeType }
+ * @param {string} mimeType - Image mime type
  * @returns {Promise<Object>} Extracted invoice header & line items
  */
-const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') => {
-  const firstAttempt = await attemptExtraction(fileBuffer, mimeType);
+const parseInvoiceImageWithGemini = async (inputData, mimeType = 'image/jpeg') => {
+  const firstAttempt = await attemptExtraction(inputData, mimeType);
 
   const referenceTotal = firstAttempt.printedGrandTotal || firstAttempt.printedSubtotal;
   const extractedSum = (firstAttempt.items || []).reduce((sum, it) => {
@@ -307,7 +284,7 @@ const parseInvoiceImageWithGemini = async (fileBuffer, mimeType = 'image/jpeg') 
 
   console.warn('[OCR Completeness Check] First attempt looks incomplete, retrying once...');
   try {
-    const secondAttempt = await attemptExtraction(fileBuffer, mimeType);
+    const secondAttempt = await attemptExtraction(inputData, mimeType);
     const secondSum = (secondAttempt.items || []).reduce((sum, it) => {
       const lineVal = it.printedLineTotal || (it.qty * it.purchaseRate) || 0;
       return sum + lineVal;

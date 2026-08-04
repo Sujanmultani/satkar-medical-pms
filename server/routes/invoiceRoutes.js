@@ -23,7 +23,7 @@ const upload = multer({
 router.use(protect);
 
 router.get('/search', searchInvoiceByNumber);
-router.post('/scan', scanRateLimiter, upload.single('image'), scanInvoice);
+router.post('/scan', scanRateLimiter, upload.any(), scanInvoice);
 router.post('/confirm', confirmInvoice);
 router.delete('/:id', deleteInvoice);
 

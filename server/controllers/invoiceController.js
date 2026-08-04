@@ -11,20 +11,20 @@ const { roundMoney } = require('../utils/money');
 // @access  Private
 const scanInvoice = async (req, res, next) => {
   try {
-    if (!req.file || !req.file.buffer) {
+    const rawFiles = req.files && req.files.length > 0 ? req.files : (req.file ? [req.file] : []);
+    if (rawFiles.length === 0) {
       return res.status(400).json({
-        error: { code: 'NO_FILE_UPLOADED', message: 'Please upload a valid invoice image file.' },
+        error: { code: 'NO_FILE_UPLOADED', message: 'Please upload valid invoice image or PDF file(s).' },
       });
     }
 
-    // Preprocess image with sharp (EXIF auto-orientation, max 2000x2000 resize, JPEG quality 90)
-    const { buffer: processedBuffer, mimeType: processedMimeType } = await preprocessInvoiceImage(
-      req.file.buffer,
-      req.file.mimetype
+    // Preprocess all uploaded image pages with sharp (EXIF auto-orientation, max 2000x2000 resize, JPEG quality 90)
+    const processedPages = await Promise.all(
+      rawFiles.map((file) => preprocessInvoiceImage(file.buffer, file.mimetype))
     );
 
     // Call Gemini multimodal invoice parser
-    const parsedData = await parseInvoiceImageWithGemini(processedBuffer, processedMimeType);
+    const parsedData = await parseInvoiceImageWithGemini(processedPages);
 
     // Auto-fill composition from known items in database
     const targetStore = ['medical', 'provision'].includes(req.body.storeType) ? req.body.storeType : 'medical';

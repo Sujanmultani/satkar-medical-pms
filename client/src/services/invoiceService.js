@@ -1,8 +1,12 @@
 import api from './api';
 
-export const scanInvoice = async (file) => {
+export const scanInvoice = async (fileOrFiles) => {
   const formData = new FormData();
-  formData.append('image', file);
+  const fileArray = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles];
+
+  fileArray.forEach((file) => {
+    formData.append('images', file);
+  });
 
   const response = await api.post('/invoices/scan', formData, {
     headers: {

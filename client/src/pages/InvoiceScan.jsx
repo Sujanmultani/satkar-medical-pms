@@ -113,6 +113,9 @@ export function InvoiceScan() {
   const [possibleMissingItems, setPossibleMissingItems] = useState(false);
   const [successData, setSuccessData] = useState(null);
 
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [previewUrls, setPreviewUrls] = useState([]);
+
   // Drag and Drop handlers
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -126,36 +129,61 @@ export function InvoiceScan() {
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      processFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      addFiles(Array.from(e.dataTransfer.files));
     }
   };
 
   const handleFileSelect = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      processFile(e.target.files[0]);
+    if (e.target.files && e.target.files.length > 0) {
+      addFiles(Array.from(e.target.files));
+      e.target.value = ''; // Reset input value so re-selecting same file triggers onChange
     }
   };
 
-  const processFile = (file) => {
-    setSelectedFile(file);
+  const addFiles = (newFiles) => {
     setErrorMsg('');
-    if (file.type.startsWith('image/')) {
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-    } else {
-      setPreviewUrl(null);
+    const valid = newFiles.filter((f) => f.type.startsWith('image/') || f.type === 'application/pdf');
+    if (valid.length === 0) {
+      setErrorMsg('Please select valid image (JPG, PNG, WEBP) or PDF file(s).');
+      return;
     }
-    runOcrScan(file);
+
+    setSelectedFiles((prev) => {
+      const combined = [...prev, ...valid];
+      const urls = combined.map((f) => (f.type.startsWith('image/') ? URL.createObjectURL(f) : null));
+      setPreviewUrls(urls);
+
+      // Auto trigger scan if 1 single file selected directly
+      if (prev.length === 0 && valid.length === 1) {
+        runOcrScan(valid);
+      }
+
+      return combined;
+    });
+  };
+
+  const removeSelectedFile = (idx) => {
+    setSelectedFiles((prev) => {
+      const updated = prev.filter((_, i) => i !== idx);
+      const urls = updated.map((f) => (f.type.startsWith('image/') ? URL.createObjectURL(f) : null));
+      setPreviewUrls(urls);
+      return updated;
+    });
+  };
+
+  const triggerMultiPageScan = () => {
+    if (selectedFiles.length === 0) return;
+    runOcrScan(selectedFiles);
   };
 
   // OCR Scan Action
-  const runOcrScan = async (file) => {
+  const runOcrScan = async (fileOrFiles) => {
     setStep('scanning');
     setErrorMsg('');
 
     try {
-      const result = await scanInvoice(file);
+      const result = await scanInvoice(fileOrFiles);
       setSupplierName(result.supplierName || 'Distributor Agency');
       setInvoiceNo(result.invoiceNo || `INV-${Date.now().toString().slice(-5)}`);
       setInvoiceDate(result.invoiceDate || new Date().toISOString().split('T')[0]);
@@ -638,13 +666,12 @@ export function InvoiceScan() {
 
         {/* STEP 1: UPLOAD ZONE */}
         {step === 'upload' && (
-          <div className="max-w-2xl mx-auto py-8">
+          <div className="max-w-2xl mx-auto py-6 space-y-6">
             <Card
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`p-10 md:p-14 text-center border-2 border-dashed cursor-pointer transition-all duration-200 bg-white/90 ${isDragging
+              className={`p-8 md:p-10 text-center border-2 border-dashed transition-all duration-200 bg-white/90 ${isDragging
                 ? 'border-secondary bg-secondary/10 shadow-lg scale-[1.01]'
                 : 'border-secondary/40 hover:border-secondary hover:bg-teal-50/30 shadow-card'
                 }`}
@@ -653,27 +680,99 @@ export function InvoiceScan() {
                 ref={fileInputRef}
                 type="file"
                 accept="image/*,.pdf"
+                multiple
                 onChange={handleFileSelect}
                 className="hidden"
               />
 
-              <div className="w-16 h-16 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center mx-auto mb-4 border border-secondary/20">
-                <UploadCloud className="w-8 h-8" />
-              </div>
+              {selectedFiles.length === 0 ? (
+                <div onClick={() => fileInputRef.current?.click()} className="cursor-pointer">
+                  <div className="w-16 h-16 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center mx-auto mb-4 border border-secondary/20">
+                    <UploadCloud className="w-8 h-8" />
+                  </div>
 
-              <h3 className="text-lg font-heading font-bold text-primary">
-                Drag and drop your invoice image here
-              </h3>
-              <p className="text-xs text-muted mt-1">
-                Supports JPG, PNG, WEBP, or PDF invoice scans up to 10MB
-              </p>
+                  <h3 className="text-lg font-heading font-bold text-primary">
+                    Drag & drop invoice pages or PDF
+                  </h3>
+                  <p className="text-xs text-muted mt-1">
+                    Supports 1 or multiple page photos (Page 1, Page 2...) or PDF files
+                  </p>
 
-              <div className="mt-6">
-                <Button variant="default" size="md" className="gap-2 px-6 shadow-md font-semibold pointer-events-none">
-                  <FileText className="w-4 h-4 text-accent" />
-                  <span>Select Image / PDF File</span>
-                </Button>
-              </div>
+                  <div className="mt-6">
+                    <Button variant="default" size="md" className="gap-2 px-6 shadow-md font-semibold pointer-events-none">
+                      <FileText className="w-4 h-4 text-accent" />
+                      <span>Select Invoice Photos / PDF</span>
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                    <h4 className="text-sm font-heading font-bold text-primary flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-secondary" />
+                      <span>Selected Invoice Pages ({selectedFiles.length})</span>
+                    </h4>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="gap-1.5 text-xs"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-secondary" />
+                      <span>Add Page</span>
+                    </Button>
+                  </div>
+
+                  {/* Thumbnails grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {selectedFiles.map((file, pIdx) => {
+                      const url = previewUrls[pIdx];
+                      return (
+                        <div key={pIdx} className="relative group rounded-xl border border-gray-200 bg-gray-50 p-2 text-left space-y-2">
+                          <div className="aspect-[3/4] w-full rounded-lg bg-gray-200 overflow-hidden flex items-center justify-center relative">
+                            {url ? (
+                              <img src={url} alt={`Page ${pIdx + 1}`} className="w-full h-full object-cover" />
+                            ) : (
+                              <FileText className="w-10 h-10 text-gray-400" />
+                            )}
+                            <span className="absolute top-1.5 left-1.5 bg-primary/90 text-white font-mono text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm">
+                              Page {pIdx + 1}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-1 text-[11px] font-mono text-gray-600 truncate px-1">
+                            <span className="truncate" title={file.name}>{file.name}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeSelectedFile(pIdx);
+                              }}
+                              className="text-gray-400 hover:text-red-600 p-0.5 rounded transition-colors"
+                              title="Remove Page"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="pt-2">
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="md"
+                      onClick={triggerMultiPageScan}
+                      className="w-full gap-2 py-3 shadow-md font-semibold text-sm"
+                    >
+                      <ScanLine className="w-5 h-5 text-accent animate-pulse" />
+                      <span>Scan {selectedFiles.length} Invoice {selectedFiles.length === 1 ? 'Page' : 'Pages'} with OCR</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
             </Card>
           </div>
         )}
