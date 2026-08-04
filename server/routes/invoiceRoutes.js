@@ -9,7 +9,7 @@ const { scanRateLimiter } = require('../middleware/rateLimiter');
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 20 * 1024 * 1024, // 20 MB limit for high-resolution photos
+    fileSize: 50 * 1024 * 1024, // 50 MB limit for high-resolution multi-page photos
   },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {

@@ -32,6 +32,8 @@ import { roundMoney } from '@/utils/money';
 export function InvoiceScan() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  const appendPageRef = useRef(null);
+  const [isScanningAppendPage, setIsScanningAppendPage] = useState(false);
 
   // Workflow states: 'upload' | 'scanning' | 'review' | 'success'
   const [step, setStep] = useState('upload');
@@ -175,6 +177,42 @@ export function InvoiceScan() {
   const triggerMultiPageScan = () => {
     if (selectedFiles.length === 0) return;
     runOcrScan(selectedFiles);
+  };
+
+  const handleAppendPageSelect = async (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files);
+      setIsScanningAppendPage(true);
+      try {
+        const result = await scanInvoice(newFiles);
+        const newItems = (result.items || []).map((item) => {
+          const pTotal = typeof item.printedLineTotal === 'number' && !isNaN(item.printedLineTotal) && item.printedLineTotal > 0
+            ? item.printedLineTotal
+            : null;
+          return {
+            ...item,
+            printedLineTotal: pTotal,
+            purchaseRate: Number(item.purchaseRate) || 0,
+            discPercent: Number(item.discPercent) || 0,
+            isManuallyEdited: false,
+          };
+        });
+
+        if (newItems.length > 0) {
+          setItems((prev) => [...prev, ...newItems]);
+        }
+
+        if (result.printedGrandTotal) setPrintedGrandTotal(result.printedGrandTotal);
+        if (result.printedRoundOff) setPrintedRoundOff(result.printedRoundOff);
+        if (result.printedSubtotal) setPrintedSubtotal(result.printedSubtotal);
+      } catch (err) {
+        console.error('[Append Page Error]', err);
+        alert(err.response?.data?.error?.message || 'Could not scan additional page photo.');
+      } finally {
+        setIsScanningAppendPage(false);
+        e.target.value = '';
+      }
+    }
   };
 
   // OCR Scan Action
@@ -905,16 +943,42 @@ export function InvoiceScan() {
                   </p>
                 </div>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addBlankRow}
-                  className="gap-1.5 self-start sm:self-auto"
-                >
-                  <Plus className="w-4 h-4 text-secondary" />
-                  <span>Add Line Item</span>
-                </Button>
+                <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                  <input
+                    ref={appendPageRef}
+                    type="file"
+                    accept="image/*,.pdf"
+                    multiple
+                    onChange={handleAppendPageSelect}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={isScanningAppendPage}
+                    onClick={() => appendPageRef.current?.click()}
+                    className="gap-1.5 text-xs font-semibold shadow-sm"
+                  >
+                    {isScanningAppendPage ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-accent" />
+                    ) : (
+                      <Plus className="w-3.5 h-3.5 text-accent" />
+                    )}
+                    <span>{isScanningAppendPage ? 'Scanning Page...' : '+ Scan Page 2 (Append)'}</span>
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addBlankRow}
+                    className="gap-1.5 text-xs"
+                  >
+                    <Plus className="w-4 h-4 text-secondary" />
+                    <span>Add Manual Row</span>
+                  </Button>
+                </div>
               </div>
 
               {/* Table */}
