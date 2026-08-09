@@ -388,28 +388,32 @@ const searchInvoiceByNumber = async (req, res, next) => {
       });
     }
 
-    const populatedInvoices = await Promise.all(
-      invoices.map(async (inv) => {
-        const itemsWithDetails = await Promise.all(
-          (inv.items || []).map(async (itemEntry) => {
-            let batchDetails = null;
-            if (itemEntry.batchId) {
-              batchDetails = await Batch.findById(itemEntry.batchId)
-                .populate('itemId', 'name composition category unit hsnCode location storeType')
-                .lean();
-            }
-            return {
-              ...itemEntry,
-              batch: batchDetails,
-            };
-          })
-        );
-        return {
-          ...inv,
-          items: itemsWithDetails,
-        };
-      })
-    );
+    // Fetch every referenced batch in ONE query instead of one findById per line item per
+    // invoice (which was doing many individual database round-trips per search).
+    const allBatchIds = [];
+    invoices.forEach((inv) => {
+      (inv.items || []).forEach((itemEntry) => {
+        if (itemEntry.batchId) allBatchIds.push(itemEntry.batchId);
+      });
+    });
+
+    const batchesById = {};
+    if (allBatchIds.length > 0) {
+      const batchDocs = await Batch.find({ _id: { $in: allBatchIds } })
+        .populate('itemId', 'name composition category unit hsnCode location storeType')
+        .lean();
+      batchDocs.forEach((b) => {
+        batchesById[b._id.toString()] = b;
+      });
+    }
+
+    const populatedInvoices = invoices.map((inv) => ({
+      ...inv,
+      items: (inv.items || []).map((itemEntry) => ({
+        ...itemEntry,
+        batch: itemEntry.batchId ? (batchesById[itemEntry.batchId.toString()] || null) : null,
+      })),
+    }));
 
     return res.status(200).json({
       data: populatedInvoices,

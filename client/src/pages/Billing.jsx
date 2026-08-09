@@ -172,10 +172,11 @@ export function Billing() {
       const newQty = Number(cleanValue);
       if (newQty > itemLine.batch.qty) {
         setErrorMessage(`Quantity exceeds stock limit (${itemLine.batch.qty}) for batch ${itemLine.batch.batchNo}.`);
+        itemLine.qty = itemLine.batch.qty;
       } else {
         setErrorMessage('');
+        itemLine.qty = newQty;
       }
-      itemLine.qty = newQty;
     } else if (field === 'rate') {
       itemLine.rate = Number(cleanValue) || 0;
     } else if (field === 'gst') {
