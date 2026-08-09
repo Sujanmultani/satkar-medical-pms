@@ -16,6 +16,7 @@ import { Settings } from '@/pages/Settings';
 import { Sidebar } from '@/components/Sidebar';
 
 import { SharedBillView } from '@/pages/SharedBillView';
+import { SharedInvoiceView } from '@/pages/SharedInvoiceView';
 
 // Protected Route Wrapper
 function ProtectedLayout() {
@@ -76,6 +77,9 @@ export default function App() {
         />
         {/* Public Shareable Bill View (No Auth Required) */}
         <Route path="/shared-bill/:token" element={<SharedBillView />} />
+
+        {/* Public Shareable Purchase Invoice View (No Auth Required) */}
+        <Route path="/shared-invoice/:token" element={<SharedInvoiceView />} />
 
         <Route path="/*" element={<ProtectedLayout />} />
       </Routes>

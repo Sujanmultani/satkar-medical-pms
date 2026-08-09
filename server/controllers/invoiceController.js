@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { parseInvoiceImageWithGemini, preprocessInvoiceImage } = require('../services/invoiceParser');
 const { findOrCreateSupplier } = require('../services/supplierService');
 const Item = require('../models/Item');
@@ -504,10 +505,90 @@ const deleteInvoice = async (req, res, next) => {
   }
 };
 
+// @desc    Get or generate public share link for a scanned invoice (Authenticated)
+// @route   GET /api/invoices/:id/share-link
+// @access  Private
+const getOrCreateInvoiceShareLink = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const invoice = await Invoice.findById(id);
+    if (!invoice) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Invoice not found.' },
+      });
+    }
+
+    if (!invoice.shareToken) {
+      invoice.shareToken = crypto.randomBytes(24).toString('hex');
+      await invoice.save();
+    }
+
+    const baseUrl = process.env.CLIENT_URL || 'https://www.satkarmedico.in';
+    const shareUrl = `${baseUrl.replace(/\/$/, '')}/shared-invoice/${invoice.shareToken}`;
+
+    return res.status(200).json({
+      data: {
+        shareUrl,
+        shareToken: invoice.shareToken,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get public invoice details by share token (Public - No Auth)
+// @route   GET /api/invoices/public/:token
+// @access  Public
+const getInvoiceByShareToken = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+    if (!token || typeof token !== 'string') {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Invoice not found or link expired.' },
+      });
+    }
+
+    const invoice = await Invoice.findOne({ shareToken: token })
+      .populate({
+        path: 'items.batchId',
+        select: 'batchNo expiryDate mrp purchaseRate gstPercent freeQty initialQty itemId',
+        populate: { path: 'itemId', select: 'name composition category unit hsnCode storeType' },
+      })
+      .lean();
+
+    if (!invoice) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Invoice not found or link expired.' },
+      });
+    }
+
+    const publicInvoice = {
+      _id: invoice._id,
+      invoiceNo: invoice.invoiceNo,
+      supplierName: invoice.supplierName,
+      invoiceDate: invoice.invoiceDate,
+      items: (invoice.items || []).map((it) => ({
+        extractedData: it.extractedData,
+        batch: it.batchId || null,
+      })),
+      gstBreakdown: invoice.gstBreakdown,
+      totalAmount: invoice.totalAmount,
+      status: invoice.status,
+    };
+
+    return res.status(200).json({ data: publicInvoice });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   scanInvoice,
   confirmInvoice,
   searchInvoiceByNumber,
   checkDuplicateInvoice,
   deleteInvoice,
+  getOrCreateInvoiceShareLink,
+  getInvoiceByShareToken,
 };

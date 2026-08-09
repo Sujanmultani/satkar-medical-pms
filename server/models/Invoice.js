@@ -63,6 +63,11 @@ const invoiceSchema = new mongoose.Schema(
       enum: ['scanned', 'confirmed'],
       default: 'scanned',
     },
+    shareToken: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
   },
   {
     timestamps: true,

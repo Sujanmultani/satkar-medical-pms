@@ -19,7 +19,7 @@ import {
   Printer,
   MessageCircle
 } from 'lucide-react';
-import { scanInvoice, confirmInvoice, searchInvoiceByNumber, checkDuplicateInvoice, deleteInvoice } from '@/services/invoiceService';
+import { scanInvoice, confirmInvoice, searchInvoiceByNumber, checkDuplicateInvoice, deleteInvoice, getOrCreateInvoiceShareLink } from '@/services/invoiceService';
 import { LogoWatermark } from '@/components/LogoWatermark';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -30,7 +30,7 @@ import { Select } from '@/components/ui/Select';
 import { SupplierAutocomplete } from '@/components/SupplierAutocomplete';
 import { Badge } from '@/components/ui/Badge';
 import { roundMoney } from '@/utils/money';
-import { buildWhatsAppInvoiceMessage, getWhatsAppShareLink } from '@/utils/whatsappBill';
+import { buildWhatsAppInvoiceLinkMessage, getWhatsAppShareLink } from '@/utils/whatsappBill';
 import { PrintableInvoice } from '@/components/PrintableInvoice';
 
 export function InvoiceScan() {
@@ -675,10 +675,17 @@ export function InvoiceScan() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          const message = buildWhatsAppInvoiceMessage(inv);
-                          const waUrl = getWhatsAppShareLink(null, message);
-                          window.open(waUrl, '_blank');
+                        onClick={async () => {
+                          try {
+                            const res = await getOrCreateInvoiceShareLink(inv._id);
+                            const shareUrl = res.data?.shareUrl;
+                            const message = buildWhatsAppInvoiceLinkMessage(inv, shareUrl);
+                            const waUrl = getWhatsAppShareLink(null, message);
+                            window.open(waUrl, '_blank');
+                          } catch (err) {
+                            console.error('Failed to generate invoice share link:', err);
+                            alert('Failed to generate WhatsApp share link. Please try again.');
+                          }
                         }}
                         className="h-8 px-3 text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-50 font-semibold gap-1.5 rounded-lg"
                         title="Share via WhatsApp"
@@ -1397,10 +1404,17 @@ export function InvoiceScan() {
 
               <Button
                 variant="outline"
-                onClick={() => {
-                  const message = buildWhatsAppInvoiceMessage(successData.invoice);
-                  const waUrl = getWhatsAppShareLink(null, message);
-                  window.open(waUrl, '_blank');
+                onClick={async () => {
+                  try {
+                    const res = await getOrCreateInvoiceShareLink(successData.invoice._id);
+                    const shareUrl = res.data?.shareUrl;
+                    const message = buildWhatsAppInvoiceLinkMessage(successData.invoice, shareUrl);
+                    const waUrl = getWhatsAppShareLink(null, message);
+                    window.open(waUrl, '_blank');
+                  } catch (err) {
+                    console.error('Failed to generate invoice share link:', err);
+                    alert('Failed to generate WhatsApp share link. Please try again.');
+                  }
                 }}
                 className="gap-2 text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-50"
               >

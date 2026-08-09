@@ -1,22 +1,36 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import logoAsset from '@/assets/satkar-logo.jpeg';
 import { Printer, MessageCircle } from 'lucide-react';
-import { buildWhatsAppInvoiceMessage, getWhatsAppShareLink } from '@/utils/whatsappBill';
+import { buildWhatsAppInvoiceLinkMessage, getWhatsAppShareLink } from '@/utils/whatsappBill';
+import { getOrCreateInvoiceShareLink } from '@/services/invoiceService';
 
 export function PrintableInvoice({ isOpen, onClose, invoice }) {
+  const [isPreparing, setIsPreparing] = useState(false);
+
   if (!isOpen || !invoice) return null;
 
   const handlePrint = () => {
     window.print();
   };
 
-  const handleWhatsAppShare = () => {
-    const message = buildWhatsAppInvoiceMessage(invoice);
-    const waUrl = getWhatsAppShareLink(null, message);
-    window.open(waUrl, '_blank');
+  const handleWhatsAppShare = async () => {
+    if (!invoice?._id || isPreparing) return;
+    setIsPreparing(true);
+    try {
+      const res = await getOrCreateInvoiceShareLink(invoice._id);
+      const shareUrl = res.data?.shareUrl;
+      const message = buildWhatsAppInvoiceLinkMessage(invoice, shareUrl);
+      const waUrl = getWhatsAppShareLink(null, message);
+      window.open(waUrl, '_blank');
+    } catch (err) {
+      console.error('Failed to generate invoice share link:', err);
+      alert('Failed to generate WhatsApp share link. Please try again.');
+    } finally {
+      setIsPreparing(false);
+    }
   };
 
   const formatDate = (d) => {
@@ -156,11 +170,12 @@ export function PrintableInvoice({ isOpen, onClose, invoice }) {
               <Button
                 variant="outline"
                 onClick={handleWhatsAppShare}
+                disabled={isPreparing}
                 className="gap-2 text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-50"
                 title="Share invoice via WhatsApp"
               >
                 <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Share via WhatsApp</span>
+                <span>{isPreparing ? 'Generating Link...' : 'Share via WhatsApp'}</span>
               </Button>
             </div>
 

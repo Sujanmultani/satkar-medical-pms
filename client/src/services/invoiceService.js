@@ -43,3 +43,13 @@ export const deleteInvoice = async (id, { rollbackStock = false } = {}) => {
   });
   return response.data;
 };
+
+export const getOrCreateInvoiceShareLink = async (id) => {
+  const response = await api.get(`/invoices/${id}/share-link`);
+  return response.data;
+};
+
+export const getInvoiceByShareToken = async (token) => {
+  const response = await api.get(`/invoices/public/${token}`);
+  return response.data;
+};

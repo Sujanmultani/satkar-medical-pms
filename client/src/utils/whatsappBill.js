@@ -97,6 +97,29 @@ export const generateBillImageBlob = async (element, billNo = 'INV') => {
 };
 
 /**
+ * Formats a WhatsApp message that links to the hosted digital purchase invoice
+ * (same style as the customer bill share link).
+ * @param {Object} invoice - Invoice document
+ * @param {String} shareUrl - Public shareable URL for this invoice
+ * @returns {String} Formatted message
+ */
+export const buildWhatsAppInvoiceLinkMessage = (invoice, shareUrl) => {
+  const supplierName = invoice?.supplierName || 'Supplier';
+  const invoiceNo = invoice?.invoiceNo || 'N/A';
+  const total = Number(invoice?.totalAmount || 0).toFixed(2);
+
+  return `📦 *PURCHASE INVOICE — Satkar Medical*
+Invoice No: ${invoiceNo}
+Supplier: ${supplierName}
+Total Amount: ₹${total}
+
+🔗 *View the digital purchase invoice here:*
+${shareUrl}
+
+Scanned & saved via Satkar Inventory System.`;
+};
+
+/**
  * Formats a clean plain-text WhatsApp message for a scanned/saved purchase invoice.
  * @param {Object} invoice - Invoice document (from confirmInvoice response or search results)
  * @returns {String} Formatted message

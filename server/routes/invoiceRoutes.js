@@ -1,7 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const { scanInvoice, confirmInvoice, searchInvoiceByNumber, checkDuplicateInvoice, deleteInvoice } = require('../controllers/invoiceController');
+const {
+  scanInvoice,
+  confirmInvoice,
+  searchInvoiceByNumber,
+  checkDuplicateInvoice,
+  deleteInvoice,
+  getOrCreateInvoiceShareLink,
+  getInvoiceByShareToken,
+} = require('../controllers/invoiceController');
 const { protect } = require('../middleware/authMiddleware');
 const { scanRateLimiter } = require('../middleware/rateLimiter');
 
@@ -20,10 +28,14 @@ const upload = multer({
   },
 });
 
+// PUBLIC ROUTE (NO AUTH) - Must be defined BEFORE protect middleware
+router.get('/public/:token', getInvoiceByShareToken);
+
 router.use(protect);
 
 router.get('/search', searchInvoiceByNumber);
 router.get('/check-duplicate', checkDuplicateInvoice);
+router.get('/:id/share-link', getOrCreateInvoiceShareLink);
 router.post('/scan', scanRateLimiter, upload.any(), scanInvoice);
 router.post('/confirm', confirmInvoice);
 router.delete('/:id', deleteInvoice);
