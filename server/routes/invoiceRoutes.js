@@ -18,6 +18,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 50 * 1024 * 1024, // 50 MB limit for high-resolution multi-page photos
+    files: 10, // cap number of files per scan request — prevents server RAM exhaustion (crash)
   },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {

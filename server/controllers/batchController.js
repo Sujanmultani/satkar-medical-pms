@@ -217,11 +217,22 @@ const deleteBatch = async (req, res, next) => {
 
 const { updateBatchExpiryStatuses } = require('../jobs/expiryStatusJob');
 
+// Throttle: only recompute expiry statuses across ALL batches at most once every 15
+// minutes, instead of on every single page load / pagination click of Expiry Alerts
+// (which was doing a full-collection scan + bulk write on every request).
+let lastExpiryRecomputeAt = 0;
+const EXPIRY_RECOMPUTE_THROTTLE_MS = 15 * 60 * 1000; // 15 minutes
+
 // Helper for status-filtered batch queries (expiring_soon / expired)
 const getBatchesByStatus = async (req, res, next, targetStatus) => {
   try {
-    // Auto-sync batch statuses in DB before querying so expired/expiring batches are 100% accurate
-    await updateBatchExpiryStatuses(false);
+    // Auto-sync batch statuses in DB before querying so expired/expiring batches are
+    // accurate — but throttled, since this is a full-collection operation.
+    const now = Date.now();
+    if (now - lastExpiryRecomputeAt > EXPIRY_RECOMPUTE_THROTTLE_MS) {
+      lastExpiryRecomputeAt = now;
+      await updateBatchExpiryStatuses(false);
+    }
 
     const { storeType } = req.query;
     const page = parseInt(req.query.page, 10) || 1;

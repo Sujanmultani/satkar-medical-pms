@@ -33,6 +33,7 @@ const billSchema = new mongoose.Schema(
           type: mongoose.Schema.Types.ObjectId,
           ref: 'Batch',
           required: true,
+          index: true,
         },
         qty: {
           type: Number,

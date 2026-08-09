@@ -105,19 +105,17 @@ const createBill = async (req, res, next) => {
       batchUpdates.push({ batch, numQty });
     }
 
-    // Step 2: Decrement batch stock
-    for (const { batch, numQty } of batchUpdates) {
-      batch.qty -= numQty;
-      await batch.save();
-    }
-
-    // Step 3: Compute GST Breakdown & Totals using roundMoney at every step
+    // Step 2: Compute GST Breakdown & Totals using roundMoney at every step
     const cgst = roundMoney(totalGstAmount / 2);
     const sgst = roundMoney(totalGstAmount - cgst);
     const totalAmount = roundMoney(subtotalAmount + totalGstAmount);
 
     const billNo = await generateBillNumber(billDate);
 
+    // Step 3: Create the bill FIRST, before touching stock. If bill creation fails
+    // (e.g. a rare billNo collision under concurrent requests), stock is left
+    // completely untouched instead of being silently decremented with no matching
+    // bill record.
     const bill = await Bill.create({
       billNo,
       billDate: new Date(billDate),
@@ -134,6 +132,19 @@ const createBill = async (req, res, next) => {
       paymentMode: paymentMode || 'Cash',
       shareStatus: { whatsapp: false, sms: false, printed: false },
     });
+
+    // Step 4: Decrement batch stock now that the bill exists. If this fails partway,
+    // delete the bill we just created so a bill never exists without matching stock
+    // having actually been deducted.
+    try {
+      for (const { batch, numQty } of batchUpdates) {
+        batch.qty -= numQty;
+        await batch.save();
+      }
+    } catch (stockError) {
+      await Bill.findByIdAndDelete(bill._id).catch(() => {});
+      throw stockError;
+    }
 
     const populatedBill = await Bill.findById(bill._id)
       .populate('items.itemId', 'name composition category unit hsnCode storeType')

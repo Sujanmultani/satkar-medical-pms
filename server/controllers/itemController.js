@@ -12,11 +12,20 @@ const populateItemBatches = async (items) => {
     .sort({ expiryDate: 1 })
     .lean();
   
-  // Sum sold quantities from bills per batch to backfill unpopulated initialQty
-  const batchIds = batches.map((b) => b._id);
+  // Sum sold quantities from bills ONLY for batches missing a valid initialQty
+  // (legacy batches created before the initialQty field existed). This avoids
+  // scanning the entire Bills collection on every single stock list load once
+  // all batches have initialQty set (the normal case for anything created via
+  // the current app), which was the #1 cause of the site slowing down as more
+  // bills accumulate over time.
+  const batchesNeedingBackfill = batches.filter(
+    (b) => b.initialQty === undefined || b.initialQty === null || b.initialQty <= 0
+  );
+
   const soldMap = {};
-  if (batchIds.length > 0) {
-    const bills = await Bill.find({ 'items.batchId': { $in: batchIds } }).select('items').lean();
+  if (batchesNeedingBackfill.length > 0) {
+    const backfillBatchIds = batchesNeedingBackfill.map((b) => b._id);
+    const bills = await Bill.find({ 'items.batchId': { $in: backfillBatchIds } }).select('items').lean();
     bills.forEach((bill) => {
       (bill.items || []).forEach((line) => {
         if (line.batchId) {
