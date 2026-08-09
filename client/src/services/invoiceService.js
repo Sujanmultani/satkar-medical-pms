@@ -22,6 +22,13 @@ export const confirmInvoice = async (invoiceData) => {
   return response.data;
 };
 
+export const checkDuplicateInvoice = async (supplierName, invoiceNo) => {
+  const response = await api.get('/invoices/check-duplicate', {
+    params: { supplierName, invoiceNo },
+  });
+  return response.data;
+};
+
 export const searchInvoiceByNumber = async (invoiceNo) => {
   const response = await api.get('/invoices/search', {
     params: { invoiceNo },

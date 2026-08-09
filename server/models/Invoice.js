@@ -69,4 +69,6 @@ const invoiceSchema = new mongoose.Schema(
   }
 );
 
+invoiceSchema.index({ supplierName: 1, invoiceNo: 1 });
+
 module.exports = mongoose.model('Invoice', invoiceSchema);

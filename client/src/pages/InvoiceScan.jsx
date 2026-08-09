@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ScanLine,
@@ -15,9 +15,11 @@ import {
   Receipt,
   Sparkles,
   ShieldAlert,
-  Search
+  Search,
+  Printer,
+  MessageCircle
 } from 'lucide-react';
-import { scanInvoice, confirmInvoice, searchInvoiceByNumber, deleteInvoice } from '@/services/invoiceService';
+import { scanInvoice, confirmInvoice, searchInvoiceByNumber, checkDuplicateInvoice, deleteInvoice } from '@/services/invoiceService';
 import { LogoWatermark } from '@/components/LogoWatermark';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -28,6 +30,8 @@ import { Select } from '@/components/ui/Select';
 import { SupplierAutocomplete } from '@/components/SupplierAutocomplete';
 import { Badge } from '@/components/ui/Badge';
 import { roundMoney } from '@/utils/money';
+import { buildWhatsAppInvoiceMessage, getWhatsAppShareLink } from '@/utils/whatsappBill';
+import { PrintableInvoice } from '@/components/PrintableInvoice';
 
 export function InvoiceScan() {
   const navigate = useNavigate();
@@ -48,6 +52,14 @@ export function InvoiceScan() {
   const [isSearchingInvoice, setIsSearchingInvoice] = useState(false);
   const [searchInvoiceResults, setSearchInvoiceResults] = useState(null);
   const [searchError, setSearchError] = useState(null);
+
+  // Duplicate Invoice Detection State
+  const [duplicateInvoiceInfo, setDuplicateInvoiceInfo] = useState(null);
+  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
+  const [confirmDuplicateOverride, setConfirmDuplicateOverride] = useState(false);
+
+  // Print/WhatsApp for a saved invoice (search results or just-confirmed one)
+  const [invoiceToPrint, setInvoiceToPrint] = useState(null);
 
   const handleSearchInvoice = async (e) => {
     if (e) e.preventDefault();
@@ -117,6 +129,36 @@ export function InvoiceScan() {
 
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
+
+  // Debounced duplicate-invoice check: fires whenever Supplier Name + Invoice No
+  // are both filled in during the review step, so the warning shows before the
+  // user even tries to submit.
+  useEffect(() => {
+    if (step !== 'review' || !supplierName.trim() || !invoiceNo.trim()) {
+      setDuplicateInvoiceInfo(null);
+      setConfirmDuplicateOverride(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsCheckingDuplicate(true);
+      try {
+        const res = await checkDuplicateInvoice(supplierName.trim(), invoiceNo.trim());
+        if (res.data?.duplicate) {
+          setDuplicateInvoiceInfo(res.data.existingInvoice);
+        } else {
+          setDuplicateInvoiceInfo(null);
+          setConfirmDuplicateOverride(false);
+        }
+      } catch (err) {
+        console.warn('Duplicate invoice check failed:', err);
+      } finally {
+        setIsCheckingDuplicate(false);
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [supplierName, invoiceNo, step]);
 
   // Drag and Drop handlers
   const handleDragOver = (e) => {
@@ -341,6 +383,11 @@ export function InvoiceScan() {
       return;
     }
 
+    if (duplicateInvoiceInfo && !confirmDuplicateOverride) {
+      alert('Ye invoice pehle se scan ho chuki hai! Agar genuinely alag invoice hai to niche wala checkbox tick karke phir Confirm & Save dabao.');
+      return;
+    }
+
     // Validate rows
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
@@ -393,6 +440,7 @@ export function InvoiceScan() {
         storeType,
         paymentStatus,
         items: itemsPayload,
+        force: confirmDuplicateOverride,
       });
 
       setSuccessData(res.data);
@@ -618,19 +666,49 @@ export function InvoiceScan() {
                       </div>
                     </div>
 
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => {
-                        setInvoiceToDelete(inv);
-                        setIsDeleteInvoiceModalOpen(true);
-                      }}
-                      className="h-8 px-3.5 text-xs bg-red-600 hover:bg-red-700 text-white font-bold gap-1.5 rounded-lg shadow shrink-0 self-start sm:self-center"
-                      title="Delete Invoice"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-white" />
-                      <span>Delete Invoice</span>
-                    </Button>
+                    <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setInvoiceToPrint(inv)}
+                        className="h-8 px-3 text-xs border-secondary/40 text-secondary hover:bg-secondary/10 font-semibold gap-1.5 rounded-lg"
+                        title="Print Invoice"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>Print</span>
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const message = buildWhatsAppInvoiceMessage(inv);
+                          const waUrl = getWhatsAppShareLink(null, message);
+                          window.open(waUrl, '_blank');
+                        }}
+                        className="h-8 px-3 text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-50 font-semibold gap-1.5 rounded-lg"
+                        title="Share via WhatsApp"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>WhatsApp</span>
+                      </Button>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          setInvoiceToDelete(inv);
+                          setIsDeleteInvoiceModalOpen(true);
+                        }}
+                        className="h-8 px-3.5 text-xs bg-red-600 hover:bg-red-700 text-white font-bold gap-1.5 rounded-lg shadow"
+                        title="Delete Invoice"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-white" />
+                        <span>Delete Invoice</span>
+                      </Button>
+                    </div>
                   </div>
 
                   {/* Line Items Table */}
@@ -928,6 +1006,43 @@ export function InvoiceScan() {
                   </Select>
                 </div>
               </div>
+
+              {/* Duplicate Invoice Warning */}
+              {isCheckingDuplicate && (
+                <div className="mt-4 p-3 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-600 flex items-center gap-2">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Checking for duplicate invoice...</span>
+                </div>
+              )}
+
+              {duplicateInvoiceInfo && (
+                <div className="mt-4 p-3.5 rounded-xl bg-red-50 border border-red-300 text-xs text-red-900 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <ShieldAlert className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold">⚠ Ye invoice pehle se scan ho chuki hai!</p>
+                      <p className="mt-0.5 text-[11px] text-red-800">
+                        Invoice <strong className="font-mono">{duplicateInvoiceInfo.invoiceNo}</strong> from{' '}
+                        <strong>{duplicateInvoiceInfo.supplierName}</strong> already saved on{' '}
+                        {duplicateInvoiceInfo.invoiceDate
+                          ? new Date(duplicateInvoiceInfo.invoiceDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                          : 'N/A'}{' '}
+                        (₹{Number(duplicateInvoiceInfo.totalAmount || 0).toFixed(2)}, {duplicateInvoiceInfo.itemCount || 0} item(s)).
+                        Galti se dobara scan to nahi ho gaya?
+                      </p>
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 pl-6 text-[11px] font-semibold text-red-900 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={confirmDuplicateOverride}
+                      onChange={(e) => setConfirmDuplicateOverride(e.target.checked)}
+                      className="w-3.5 h-3.5 accent-red-600"
+                    />
+                    <span>Haan, mujhe khabar hai — ye genuinely alag invoice hai, phir bhi save karo</span>
+                  </label>
+                </div>
+              )}
             </Card>
 
             {/* Line Items Table Card */}
@@ -1225,7 +1340,7 @@ export function InvoiceScan() {
                 {/* Confirm Button */}
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || Boolean(duplicateInvoiceInfo && !confirmDuplicateOverride)}
                   className="relative inline-flex overflow-hidden rounded-xl p-[1.5px] focus:outline-none focus:ring-2 focus:ring-secondary shrink-0 group transition-transform active:scale-95 disabled:opacity-50"
                 >
                   <span className="absolute inset-[-1000%] animate-[spin_4s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#0B4C52_0%,#17878E_33%,#5CA627_66%,#0B4C52_100%)]" />
@@ -1266,6 +1381,30 @@ export function InvoiceScan() {
               </div>
             </div>
 
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setInvoiceToPrint(successData.invoice)}
+                className="gap-2 text-xs border-secondary/40 text-secondary hover:bg-secondary/10"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Print Invoice</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const message = buildWhatsAppInvoiceMessage(successData.invoice);
+                  const waUrl = getWhatsAppShareLink(null, message);
+                  window.open(waUrl, '_blank');
+                }}
+                className="gap-2 text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>Share via WhatsApp</span>
+              </Button>
+            </div>
+
             <div className="flex items-center gap-3 mt-2">
               <Button
                 variant="outline"
@@ -1290,6 +1429,13 @@ export function InvoiceScan() {
             </div>
           </Card>
         )}
+
+        {/* Printable Invoice Dialog (Print / WhatsApp) */}
+        <PrintableInvoice
+          isOpen={Boolean(invoiceToPrint)}
+          onClose={() => setInvoiceToPrint(null)}
+          invoice={invoiceToPrint}
+        />
 
         {/* Delete Invoice Confirmation Modal */}
         {isDeleteInvoiceModalOpen && invoiceToDelete && (

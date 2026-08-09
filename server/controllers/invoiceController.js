@@ -131,6 +131,7 @@ const confirmInvoice = async (req, res, next) => {
       storeType = 'medical',
       paymentStatus = 'pending',
       items,
+      force,
     } = req.body;
     const isPaid = paymentStatus === 'paid';
 
@@ -138,6 +139,28 @@ const confirmInvoice = async (req, res, next) => {
       return res.status(400).json({
         error: { code: 'INVALID_ITEMS', message: 'At least one line item is required to confirm invoice.' },
       });
+    }
+
+    // Duplicate invoice guard: block accidental double-scan of the same supplier invoice
+    // unless the client explicitly confirms it's intentional (force: true).
+    if (!force && supplierName && supplierName.trim() && invoiceNo && invoiceNo.trim()) {
+      const escapedSupplier = supplierName.trim().replace(/[/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const escapedNo = invoiceNo.trim().replace(/[/\\^$*+?.()|[\]{}]/g, '\\$&');
+
+      const dupInvoice = await Invoice.findOne({
+        supplierName: { $regex: new RegExp(`^${escapedSupplier}$`, 'i') },
+        invoiceNo: { $regex: new RegExp(`^${escapedNo}$`, 'i') },
+      }).lean();
+
+      if (dupInvoice) {
+        return res.status(409).json({
+          error: {
+            code: 'DUPLICATE_INVOICE',
+            message: `Invoice "${invoiceNo.trim()}" from "${supplierName.trim()}" is already scanned & saved. Please confirm again only if this is genuinely a different invoice.`,
+          },
+          data: { existingInvoice: dupInvoice },
+        });
+      }
     }
 
     let createdItemsCount = 0;
@@ -294,6 +317,50 @@ const confirmInvoice = async (req, res, next) => {
   }
 };
 
+// @desc    Check if an invoice with the same supplier + invoice number already exists
+// @route   GET /api/invoices/check-duplicate
+// @access  Private
+const checkDuplicateInvoice = async (req, res, next) => {
+  try {
+    const { supplierName, invoiceNo } = req.query;
+
+    if (!supplierName || !supplierName.trim() || !invoiceNo || !invoiceNo.trim()) {
+      return res.status(200).json({ data: { duplicate: false } });
+    }
+
+    const escapedSupplier = supplierName.trim().replace(/[/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const escapedNo = invoiceNo.trim().replace(/[/\\^$*+?.()|[\]{}]/g, '\\$&');
+
+    const existing = await Invoice.findOne({
+      supplierName: { $regex: new RegExp(`^${escapedSupplier}$`, 'i') },
+      invoiceNo: { $regex: new RegExp(`^${escapedNo}$`, 'i') },
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!existing) {
+      return res.status(200).json({ data: { duplicate: false } });
+    }
+
+    return res.status(200).json({
+      data: {
+        duplicate: true,
+        existingInvoice: {
+          _id: existing._id,
+          invoiceNo: existing.invoiceNo,
+          supplierName: existing.supplierName,
+          invoiceDate: existing.invoiceDate,
+          totalAmount: existing.totalAmount,
+          createdAt: existing.createdAt,
+          itemCount: Array.isArray(existing.items) ? existing.items.length : 0,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Search invoice by invoice number
 // @route   GET /api/invoices/search
 // @access  Private
@@ -441,5 +508,6 @@ module.exports = {
   scanInvoice,
   confirmInvoice,
   searchInvoiceByNumber,
+  checkDuplicateInvoice,
   deleteInvoice,
 };

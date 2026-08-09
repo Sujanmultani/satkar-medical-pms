@@ -95,3 +95,47 @@ export const generateBillImageBlob = async (element, billNo = 'INV') => {
     }, 'image/png');
   });
 };
+
+/**
+ * Formats a clean plain-text WhatsApp message for a scanned/saved purchase invoice.
+ * @param {Object} invoice - Invoice document (from confirmInvoice response or search results)
+ * @returns {String} Formatted message
+ */
+export const buildWhatsAppInvoiceMessage = (invoice) => {
+  const supplierName = invoice?.supplierName || 'Supplier';
+  const invoiceNo = invoice?.invoiceNo || 'N/A';
+  const dateStr = invoice?.invoiceDate
+    ? new Date(invoice.invoiceDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+    : '';
+
+  const items = invoice?.items || [];
+  let itemsListText = '';
+
+  items.forEach((itemEntry, i) => {
+    const ext = itemEntry.extractedData || {};
+    const batch = itemEntry.batch || {};
+    const liveItem = batch.itemId || {};
+
+    const name = liveItem.name || ext.name || 'Item';
+    const qty = Number(ext.qty) || 0;
+    const rate = Number(batch.purchaseRate !== undefined ? batch.purchaseRate : ext.purchaseRate) || 0;
+    const lineTotal = (qty * rate).toFixed(2);
+    itemsListText += `${i + 1}. ${name}\n   Qty: ${qty} x ₹${rate.toFixed(2)} = ₹${lineTotal}\n`;
+  });
+
+  const totalAmount = Number(invoice?.totalAmount || 0).toFixed(2);
+
+  const message = `📦 *PURCHASE INVOICE — Satkar*
+--------------------------------
+*Invoice No:* ${invoiceNo}
+*Supplier:* ${supplierName}
+*Date:* ${dateStr}
+
+*ITEMS RECEIVED:*
+${itemsListText}--------------------------------
+*TOTAL AMOUNT:* ₹${totalAmount}
+--------------------------------
+Scanned & saved via Satkar Inventory System.`;
+
+  return message;
+};
