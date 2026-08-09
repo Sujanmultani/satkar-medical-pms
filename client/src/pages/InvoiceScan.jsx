@@ -56,7 +56,6 @@ export function InvoiceScan() {
   // Duplicate Invoice Detection State
   const [duplicateInvoiceInfo, setDuplicateInvoiceInfo] = useState(null);
   const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
-  const [confirmDuplicateOverride, setConfirmDuplicateOverride] = useState(false);
 
   // Print/WhatsApp for a saved invoice (search results or just-confirmed one)
   const [invoiceToPrint, setInvoiceToPrint] = useState(null);
@@ -136,7 +135,6 @@ export function InvoiceScan() {
   useEffect(() => {
     if (step !== 'review' || !supplierName.trim() || !invoiceNo.trim()) {
       setDuplicateInvoiceInfo(null);
-      setConfirmDuplicateOverride(false);
       return;
     }
 
@@ -144,12 +142,7 @@ export function InvoiceScan() {
       setIsCheckingDuplicate(true);
       try {
         const res = await checkDuplicateInvoice(supplierName.trim(), invoiceNo.trim());
-        if (res.data?.duplicate) {
-          setDuplicateInvoiceInfo(res.data.existingInvoice);
-        } else {
-          setDuplicateInvoiceInfo(null);
-          setConfirmDuplicateOverride(false);
-        }
+        setDuplicateInvoiceInfo(res.data?.duplicate ? res.data.existingInvoice : null);
       } catch (err) {
         console.warn('Duplicate invoice check failed:', err);
       } finally {
@@ -383,8 +376,8 @@ export function InvoiceScan() {
       return;
     }
 
-    if (duplicateInvoiceInfo && !confirmDuplicateOverride) {
-      alert('Ye invoice pehle se scan ho chuki hai! Agar genuinely alag invoice hai to niche wala checkbox tick karke phir Confirm & Save dabao.');
+    if (duplicateInvoiceInfo) {
+      alert('Ye invoice already add ho chuki hai! Isko dobara save nahi kiya ja sakta.');
       return;
     }
 
@@ -440,7 +433,6 @@ export function InvoiceScan() {
         storeType,
         paymentStatus,
         items: itemsPayload,
-        force: confirmDuplicateOverride,
       });
 
       setSuccessData(res.data);
@@ -1016,31 +1008,43 @@ export function InvoiceScan() {
               )}
 
               {duplicateInvoiceInfo && (
-                <div className="mt-4 p-3.5 rounded-xl bg-red-50 border border-red-300 text-xs text-red-900 space-y-2">
+                <div className="mt-4 p-3.5 rounded-xl bg-red-50 border border-red-300 text-xs text-red-900 space-y-2.5">
                   <div className="flex items-start gap-2">
                     <ShieldAlert className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-bold">⚠ Ye invoice pehle se scan ho chuki hai!</p>
+                      <p className="font-bold">❌ this invoice is already stored!</p>
                       <p className="mt-0.5 text-[11px] text-red-800">
                         Invoice <strong className="font-mono">{duplicateInvoiceInfo.invoiceNo}</strong> from{' '}
-                        <strong>{duplicateInvoiceInfo.supplierName}</strong> already saved on{' '}
+                        <strong>{duplicateInvoiceInfo.supplierName}</strong> pehle se hi saved hai — on{' '}
                         {duplicateInvoiceInfo.invoiceDate
                           ? new Date(duplicateInvoiceInfo.invoiceDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
                           : 'N/A'}{' '}
                         (₹{Number(duplicateInvoiceInfo.totalAmount || 0).toFixed(2)}, {duplicateInvoiceInfo.itemCount || 0} item(s)).
-                        Galti se dobara scan to nahi ho gaya?
+                        Ise dobara save nahi kiya ja sakta.
                       </p>
                     </div>
                   </div>
-                  <label className="flex items-center gap-2 pl-6 text-[11px] font-semibold text-red-900 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={confirmDuplicateOverride}
-                      onChange={(e) => setConfirmDuplicateOverride(e.target.checked)}
-                      className="w-3.5 h-3.5 accent-red-600"
-                    />
-                    <span>Haan, mujhe khabar hai — ye genuinely alag invoice hai, phir bhi save karo</span>
-                  </label>
+                  <div className="pl-6">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSearchInvoiceNo(duplicateInvoiceInfo.invoiceNo);
+                        setSearchError(null);
+                        setIsSearchingInvoice(true);
+                        searchInvoiceByNumber(duplicateInvoiceInfo.invoiceNo)
+                          .then((res) => setSearchInvoiceResults(res.data || []))
+                          .catch((err) => setSearchError(err.response?.data?.error?.message || 'No invoice found with this number.'))
+                          .finally(() => setIsSearchingInvoice(false));
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="h-7 px-3 text-[11px] font-semibold border-red-300 text-red-800 hover:bg-red-100 gap-1.5"
+                    >
+                      <Search className="w-3 h-3" />
+                      <span>View Saved Invoice</span>
+                    </Button>
+                  </div>
                 </div>
               )}
             </Card>
@@ -1340,7 +1344,7 @@ export function InvoiceScan() {
                 {/* Confirm Button */}
                 <button
                   type="submit"
-                  disabled={isSubmitting || Boolean(duplicateInvoiceInfo && !confirmDuplicateOverride)}
+                  disabled={isSubmitting || Boolean(duplicateInvoiceInfo)}
                   className="relative inline-flex overflow-hidden rounded-xl p-[1.5px] focus:outline-none focus:ring-2 focus:ring-secondary shrink-0 group transition-transform active:scale-95 disabled:opacity-50"
                 >
                   <span className="absolute inset-[-1000%] animate-[spin_4s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#0B4C52_0%,#17878E_33%,#5CA627_66%,#0B4C52_100%)]" />
