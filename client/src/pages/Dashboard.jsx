@@ -13,7 +13,8 @@ import {
   Sparkles,
   ArrowRight,
   ScanLine,
-  TrendingUp
+  TrendingUp,
+  IndianRupee
 } from 'lucide-react';
 
 export function Dashboard() {
@@ -23,6 +24,8 @@ export function Dashboard() {
   const [summary, setSummary] = useState({
     totalItems: 0,
     totalBatchQty: 0,
+    totalStockValue: 0,
+    totalStockValueMRP: 0,
     todaySales: 0,
     totalRevenue: 0,
     expiringSoonCount: 0,
@@ -198,6 +201,24 @@ export function Dashboard() {
                 {loading ? '...' : summary.totalBatchQty}
               </div>
               <p className="text-xs text-muted mt-1">Across all active batches</p>
+            </CardContent>
+          </Card>
+
+          {/* Total Stock Value Card */}
+          <Card className="hover:border-primary/40 transition-all border-l-4 border-l-primary bg-primary/5">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-mono text-muted uppercase">Total Stock Value</CardTitle>
+              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                <IndianRupee className="w-4 h-4" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold font-mono text-primary">
+                ₹{loading ? '...' : (summary.totalStockValue || 0).toFixed(2)}
+              </div>
+              <p className="text-xs text-muted mt-1">
+                {loading ? 'Calculating...' : `At purchase cost · MRP value ₹${(summary.totalStockValueMRP || 0).toFixed(2)}`}
+              </p>
             </CardContent>
           </Card>
 

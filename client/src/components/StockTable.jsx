@@ -14,7 +14,8 @@ import {
   Tag,
   FlaskConical,
   BookOpen,
-  Bookmark
+  Bookmark,
+  IndianRupee
 } from 'lucide-react';
 import { getItems, createItem, updateItem, deleteItem } from '@/services/itemService';
 import { createBatch, updateBatch, deleteBatch } from '@/services/batchService';
@@ -156,6 +157,10 @@ export function StockTable({ storeType = 'medical' }) {
     (acc, item) => acc + (item.batches?.reduce((bAcc, b) => bAcc + (b.qty || 0), 0) || 0),
     0
   );
+  const totalStockValue = items.reduce(
+    (acc, item) => acc + (item.batches?.reduce((bAcc, b) => bAcc + ((b.qty || 0) * (b.purchaseRate || 0)), 0) || 0),
+    0
+  );
 
   // Helper calculations per item
   const getItemSummary = (item) => {
@@ -281,7 +286,7 @@ export function StockTable({ storeType = 'medical' }) {
       )}
 
       {/* Metric Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-4 flex items-center justify-between border-l-4 border-l-primary">
           <div>
             <p className="text-xs font-mono text-muted uppercase tracking-wider">Total Items</p>
@@ -309,6 +314,16 @@ export function StockTable({ storeType = 'medical' }) {
           </div>
           <div className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center">
             <Package className="w-5 h-5" />
+          </div>
+        </Card>
+
+        <Card className="p-4 flex items-center justify-between border-l-4 border-l-primary">
+          <div>
+            <p className="text-xs font-mono text-muted uppercase tracking-wider">Stock Value (₹)</p>
+            <p className="text-2xl font-heading font-bold text-primary mt-0.5">₹{totalStockValue.toFixed(2)}</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+            <IndianRupee className="w-5 h-5" />
           </div>
         </Card>
       </div>

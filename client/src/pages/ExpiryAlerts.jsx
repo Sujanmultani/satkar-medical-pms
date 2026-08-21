@@ -10,9 +10,10 @@ import {
   Calendar,
   Filter,
   Undo2,
-  Building2
+  Building2,
+  Pencil
 } from 'lucide-react';
-import { getExpiringSoon, getExpired, deleteBatch } from '@/services/batchService';
+import { getExpiringSoon, getExpired, deleteBatch, updateBatch } from '@/services/batchService';
 import { createReturn } from '@/services/returnService';
 import { LogoWatermark } from '@/components/LogoWatermark';
 import { Card } from '@/components/ui/Card';
@@ -43,6 +44,13 @@ export function ExpiryAlerts() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [batchToDelete, setBatchToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Edit Expiry Date modal state
+  const [isEditExpiryModalOpen, setIsEditExpiryModalOpen] = useState(false);
+  const [batchToEditExpiry, setBatchToEditExpiry] = useState(null);
+  const [editMfgDate, setEditMfgDate] = useState('');
+  const [editExpiryDate, setEditExpiryDate] = useState('');
+  const [isSavingExpiry, setIsSavingExpiry] = useState(false);
 
   // Supplier Return modal state
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
@@ -98,6 +106,46 @@ export function ExpiryAlerts() {
       alert('Failed to dispose batch. Please try again.');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const formatDateForInput = (d) => {
+    if (!d) return '';
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return '';
+    return date.toISOString().split('T')[0];
+  };
+
+  const handleOpenEditExpiry = (batch) => {
+    setBatchToEditExpiry(batch);
+    setEditMfgDate(formatDateForInput(batch.mfgDate));
+    setEditExpiryDate(formatDateForInput(batch.expiryDate));
+    setIsEditExpiryModalOpen(true);
+  };
+
+  const handleSaveExpiryDate = async (e) => {
+    e.preventDefault();
+    if (!batchToEditExpiry) return;
+
+    if (!editExpiryDate) {
+      alert('Expiry date is required.');
+      return;
+    }
+
+    setIsSavingExpiry(true);
+    try {
+      await updateBatch(batchToEditExpiry._id, {
+        expiryDate: editExpiryDate,
+        mfgDate: editMfgDate || null,
+      });
+      setIsEditExpiryModalOpen(false);
+      setBatchToEditExpiry(null);
+      fetchAlerts();
+    } catch (err) {
+      console.error('Failed to update expiry date:', err);
+      alert(err.response?.data?.error?.message || 'Failed to update expiry date. Please try again.');
+    } finally {
+      setIsSavingExpiry(false);
     }
   };
 
@@ -328,7 +376,7 @@ export function ExpiryAlerts() {
                 <TableHead className="text-center font-mono">Stock Qty</TableHead>
                 <TableHead className="text-right font-mono">MRP (₹)</TableHead>
                 <TableHead className="text-center">Status</TableHead>
-                {activeTab === 'expired' && <TableHead className="text-right">Actions</TableHead>}
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -394,34 +442,46 @@ export function ExpiryAlerts() {
                       )}
                     </TableCell>
 
-                    {isExpired && (
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenReturnModal(batch)}
-                            className="h-8 px-2.5 text-xs gap-1 border-amber-300 hover:bg-amber-50 text-amber-800"
-                          >
-                            <Undo2 className="w-3.5 h-3.5" />
-                            <span>Return to Supplier</span>
-                          </Button>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenEditExpiry(batch)}
+                          className="h-8 px-2.5 text-xs gap-1 border-secondary/40 hover:bg-secondary/10 text-secondary-dark"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Edit Expiry</span>
+                        </Button>
 
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => {
-                              setBatchToDelete(batch);
-                              setIsDeleteModalOpen(true);
-                            }}
-                            className="h-8 px-2.5 text-xs gap-1"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Dispose</span>
-                          </Button>
-                        </div>
-                      </TableCell>
-                    )}
+                        {isExpired && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenReturnModal(batch)}
+                              className="h-8 px-2.5 text-xs gap-1 border-amber-300 hover:bg-amber-50 text-amber-800"
+                            >
+                              <Undo2 className="w-3.5 h-3.5" />
+                              <span>Return to Supplier</span>
+                            </Button>
+
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => {
+                                setBatchToDelete(batch);
+                                setIsDeleteModalOpen(true);
+                              }}
+                              className="h-8 px-2.5 text-xs gap-1"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Dispose</span>
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -441,6 +501,68 @@ export function ExpiryAlerts() {
           title={`Dispose Expired Batch "${batchToDelete?.batchNo}"?`}
           message={`Are you sure you want to permanently delete batch "${batchToDelete?.batchNo}" (${batchToDelete?.itemId?.name})? This action removes expired stock from your system.`}
         />
+
+        {/* Edit Expiry Date Modal */}
+        <Dialog
+          isOpen={isEditExpiryModalOpen}
+          onClose={() => {
+            setIsEditExpiryModalOpen(false);
+            setBatchToEditExpiry(null);
+          }}
+          title={`Edit Expiry Date — Batch ${batchToEditExpiry?.batchNo || ''}`}
+          description="Correct a wrongly entered manufacturing or expiry date for this batch."
+          className="max-w-md"
+        >
+          <form onSubmit={handleSaveExpiryDate} className="space-y-4 text-xs">
+            <div>
+              <Label htmlFor="editItemDetails">Item & Batch Info</Label>
+              <div className="p-2.5 bg-slate-50 border rounded-lg space-y-1">
+                <p className="font-semibold text-primary">{batchToEditExpiry?.itemId?.name}</p>
+                <p className="text-muted font-mono text-[11px]">
+                  Batch: {batchToEditExpiry?.batchNo} | Current Exp: {formatDate(batchToEditExpiry?.expiryDate)}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="editMfgDate">Mfg Date (Optional)</Label>
+                <Input
+                  id="editMfgDate"
+                  type="date"
+                  value={editMfgDate}
+                  onChange={(e) => setEditMfgDate(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="editExpiryDate">
+                  Expiry Date <span className="text-error">*</span>
+                </Label>
+                <Input
+                  id="editExpiryDate"
+                  type="date"
+                  value={editExpiryDate}
+                  onChange={(e) => setEditExpiryDate(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <p className="text-[11px] text-muted">
+              Saving will automatically move this batch to the correct tab (Expiring Soon / Expired / back to normal active stock) based on the corrected date.
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsEditExpiryModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="default" size="sm" disabled={isSavingExpiry}>
+                {isSavingExpiry ? 'Saving...' : 'Save Expiry Date'}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
 
         {/* Supplier Return Modal */}
         <Dialog

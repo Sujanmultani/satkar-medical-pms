@@ -12,16 +12,22 @@ const getDashboardSummary = async (req, res, next) => {
   try {
     const totalItems = await Item.countDocuments();
     
-    const batches = await Batch.find({}).select('qty status expiryDate').lean();
+    const batches = await Batch.find({}).select('qty status expiryDate purchaseRate mrp').lean();
     
     let totalBatchQty = 0;
     let expiringSoonCount = 0;
     let expiredCount = 0;
+    let totalStockValue = 0;
+    let totalStockValueMRP = 0;
 
     batches.forEach((b) => {
-      totalBatchQty += b.qty || 0;
+      const qty = b.qty || 0;
+      totalBatchQty += qty;
+      // Current stock worth: cost basis (purchase rate) and potential sale value (MRP)
+      totalStockValue += qty * (b.purchaseRate || 0);
+      totalStockValueMRP += qty * (b.mrp || 0);
       // Exclude qty <= 0 batches from expiring_soon and expired counts (matching Expiry Alerts)
-      if ((b.qty || 0) > 0) {
+      if (qty > 0) {
         const liveStatus = computeBatchStatus(b.expiryDate);
         if (liveStatus === 'expiring_soon') expiringSoonCount++;
         if (liveStatus === 'expired') expiredCount++;
@@ -70,6 +76,8 @@ const getDashboardSummary = async (req, res, next) => {
     return res.status(200).json({
       totalItems,
       totalBatchQty,
+      totalStockValue: roundMoney(totalStockValue),
+      totalStockValueMRP: roundMoney(totalStockValueMRP),
       todaySales: todayNetSales,
       todayGrossSales: roundMoney(todayGrossSales),
       todayCustomerReturnRefunds: roundMoney(todayCustomerReturnRefunds),
