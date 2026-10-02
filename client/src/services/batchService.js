@@ -17,6 +17,11 @@ export const getExpired = async (params = {}) => {
   return response.data;
 };
 
+export const getBatchesByMonth = async (params = {}) => {
+  const response = await api.get('/batches/by-month', { params });
+  return response.data;
+};
+
 export const createBatch = async (batchData) => {
   const response = await api.post('/batches', batchData);
   return response.data;
@@ -42,6 +47,7 @@ export default {
   getBatchesByItem,
   getExpiringSoon,
   getExpired,
+  getBatchesByMonth,
   createBatch,
   updateBatch,
   updatePaymentStatus,

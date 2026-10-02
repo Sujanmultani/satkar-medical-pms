@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { 
   AlertTriangle, 
@@ -11,9 +11,10 @@ import {
   Filter,
   Undo2,
   Building2,
-  Pencil
+  Pencil,
+  Printer
 } from 'lucide-react';
-import { getExpiringSoon, getExpired, deleteBatch, updateBatch } from '@/services/batchService';
+import { getExpiringSoon, getExpired, getBatchesByMonth, deleteBatch, updateBatch } from '@/services/batchService';
 import { createReturn } from '@/services/returnService';
 import { LogoWatermark } from '@/components/LogoWatermark';
 import { Card } from '@/components/ui/Card';
@@ -26,15 +27,28 @@ import { Dialog } from '@/components/ui/Dialog';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/Table';
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
 import { PrintableReturn } from '@/components/PrintableReturn';
+import { PrintableExpiryReport } from '@/components/PrintableExpiryReport';
 import { SupplierAutocomplete } from '@/components/SupplierAutocomplete';
 
 export function ExpiryAlerts() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') === 'expired' ? 'expired' : 'expiring';
+  const tabParam = searchParams.get('tab');
+  const initialTab = tabParam === 'expired' ? 'expired' : tabParam === 'monthly' ? 'monthly' : 'expiring';
 
-  const [activeTab, setActiveTab] = useState(initialTab); // 'expiring' | 'expired'
+  const [activeTab, setActiveTab] = useState(initialTab); // 'expiring' | 'expired' | 'monthly'
   const [storeType, setStoreType] = useState('all'); // 'all' | 'medical' | 'provision'
   const [filterDate, setFilterDate] = useState(''); // Filter by target expiry date
+
+  // Monthly report state
+  const getCurrentYearMonth = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  };
+
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentYearMonth());
+  const [isReportPrintModalOpen, setIsReportPrintModalOpen] = useState(false);
 
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -67,14 +81,37 @@ export function ExpiryAlerts() {
   const [createdReturnRecord, setCreatedReturnRecord] = useState(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
+  const getMonthOffset = (offsetMonths) => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + offsetMonths);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  };
+
+  const formatMonthLabel = (yearMonthStr) => {
+    if (!yearMonthStr) return '';
+    const [y, m] = yearMonthStr.split('-');
+    const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
+    return isNaN(date.getTime())
+      ? yearMonthStr
+      : date.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  };
+
   const fetchAlerts = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const params = storeType !== 'all' ? { storeType } : {};
-      const res = activeTab === 'expiring' 
-        ? await getExpiringSoon(params)
-        : await getExpired(params);
+      let res;
+      if (activeTab === 'monthly') {
+        res = await getBatchesByMonth({ ...params, month: selectedMonth });
+      } else if (activeTab === 'expiring') {
+        res = await getExpiringSoon({ ...params, limit: 1000 });
+      } else {
+        res = await getExpired({ ...params, limit: 1000 });
+      }
       setBatches(res.data || []);
     } catch (err) {
       console.error('Failed to load expiry alerts:', err);
@@ -82,7 +119,7 @@ export function ExpiryAlerts() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, storeType]);
+  }, [activeTab, storeType, selectedMonth]);
 
   useEffect(() => {
     fetchAlerts();
@@ -211,6 +248,7 @@ export function ExpiryAlerts() {
   };
 
   const displayedBatches = batches.filter((b) => {
+    if (activeTab === 'monthly') return true;
     if (!filterDate) return true;
     if (!b.expiryDate) return false;
     const batchExpDate = new Date(b.expiryDate);
@@ -222,6 +260,16 @@ export function ExpiryAlerts() {
 
     return batchExpDate <= targetDate;
   });
+
+  const monthlyMetrics = useMemo(() => {
+    const totalItems = displayedBatches.length;
+    const totalQty = displayedBatches.reduce((acc, b) => acc + (Number(b.qty) || 0), 0);
+    const totalValue = displayedBatches.reduce(
+      (acc, b) => acc + (Number(b.qty) || 0) * (Number(b.mrp) || 0),
+      0
+    );
+    return { totalItems, totalQty, totalValue };
+  }, [displayedBatches]);
 
   return (
     <div className="relative min-h-screen p-6 md:p-8 bg-background">
@@ -237,29 +285,43 @@ export function ExpiryAlerts() {
               <span>Expiry Management Alerts</span>
             </h1>
             <p className="text-xs text-muted mt-1">
-              Track expiring batches and record supplier returns or dispossals for expired medicine stock.
+              Track expiring batches by month, print audit sheets, and record supplier returns or disposals.
             </p>
           </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={fetchAlerts}
-            disabled={loading}
-            className="gap-2 self-start sm:self-auto"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            <span>Refresh Alerts</span>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setIsReportPrintModalOpen(true)}
+              disabled={loading || displayedBatches.length === 0}
+              className="gap-2 bg-primary hover:bg-primary-dark text-white font-semibold shadow-sm"
+              title="Print Current Expiry List"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print Expiry List</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchAlerts}
+              disabled={loading}
+              className="gap-2"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <span>Refresh Alerts</span>
+            </Button>
+          </div>
         </div>
 
         {/* Tab & Filter Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/80 p-3 rounded-2xl border border-gray-200 shadow-sm backdrop-blur-sm">
           {/* Tabs */}
-          <div className="flex items-center gap-1.5 p-1 bg-gray-100/80 rounded-xl">
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-gray-100/80 rounded-xl">
             <button
               onClick={() => handleTabChange('expiring')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'expiring'
                   ? 'bg-amber-500 text-white shadow-sm'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
@@ -271,7 +333,7 @@ export function ExpiryAlerts() {
 
             <button
               onClick={() => handleTabChange('expired')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'expired'
                   ? 'bg-red-600 text-white shadow-sm'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
@@ -280,31 +342,45 @@ export function ExpiryAlerts() {
               <AlertTriangle className="w-3.5 h-3.5" />
               <span>Already Expired</span>
             </button>
+
+            <button
+              onClick={() => handleTabChange('monthly')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'monthly'
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Monthly Expiry Report</span>
+            </button>
           </div>
 
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-3 self-end sm:self-auto">
-            {/* Target Expiry Date Filter Input */}
-            <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-xl">
-              <Calendar className="w-3.5 h-3.5 text-secondary" />
-              <Label htmlFor="filterDate" className="text-xs font-semibold text-gray-700 whitespace-nowrap">Target Expiry Date:</Label>
-              <Input
-                id="filterDate"
-                type="date"
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                className="w-36 text-xs py-1 h-7 font-mono bg-white"
-              />
-              {filterDate && (
-                <button
-                  onClick={() => setFilterDate('')}
-                  className="text-xs font-medium text-red-600 hover:text-red-800 px-1.5 py-0.5 rounded hover:bg-red-50"
-                  title="Clear date filter"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
+            {/* Target Expiry Date Filter Input (for expiring/expired tabs) */}
+            {activeTab !== 'monthly' && (
+              <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-xl">
+                <Calendar className="w-3.5 h-3.5 text-secondary" />
+                <Label htmlFor="filterDate" className="text-xs font-semibold text-gray-700 whitespace-nowrap">Target Date:</Label>
+                <Input
+                  id="filterDate"
+                  type="date"
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                  className="w-36 text-xs py-1 h-7 font-mono bg-white"
+                />
+                {filterDate && (
+                  <button
+                    onClick={() => setFilterDate('')}
+                    className="text-xs font-medium text-red-600 hover:text-red-800 px-1.5 py-0.5 rounded hover:bg-red-50"
+                    title="Clear date filter"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
 
             <div className="flex items-center gap-2">
               <Filter className="w-3.5 h-3.5 text-muted" />
@@ -320,6 +396,107 @@ export function ExpiryAlerts() {
             </div>
           </div>
         </div>
+
+        {/* Monthly Controls Banner (Visible on 'monthly' tab) */}
+        {activeTab === 'monthly' && (
+          <div className="bg-gradient-to-r from-teal-50/90 via-emerald-50/70 to-blue-50/80 p-4 rounded-2xl border border-teal-200/80 shadow-sm space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              {/* Month picker & Quick jump pills */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-teal-200 shadow-xs">
+                  <Calendar className="w-4 h-4 text-primary" />
+                  <Label htmlFor="monthSelect" className="text-xs font-bold text-gray-800 whitespace-nowrap">
+                    Select Month:
+                  </Label>
+                  <Input
+                    id="monthSelect"
+                    type="month"
+                    value={selectedMonth}
+                    onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
+                    className="w-40 text-xs py-1 h-8 font-semibold text-primary bg-slate-50 border-gray-300"
+                  />
+                </div>
+
+                {/* Quick jump pills */}
+                <div className="flex items-center gap-1.5 bg-white/80 p-1 rounded-xl border border-teal-100 text-xs">
+                  {[
+                    { label: 'This Month', offset: 0 },
+                    { label: 'Next Month', offset: 1 },
+                    { label: '+2 Months', offset: 2 },
+                  ].map(({ label, offset }) => {
+                    const mVal = getMonthOffset(offset);
+                    const isSelected = selectedMonth === mVal;
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => setSelectedMonth(mVal)}
+                        className={`px-3 py-1 rounded-lg font-medium transition-all ${
+                          isSelected
+                            ? 'bg-primary text-white shadow-xs font-bold'
+                            : 'text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        {label} ({formatMonthLabel(mVal).split(' ')[0]})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Prominent Print Monthly List Button */}
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setIsReportPrintModalOpen(true)}
+                disabled={loading || displayedBatches.length === 0}
+                className="gap-2 bg-teal-700 hover:bg-teal-800 text-white font-bold shadow-sm self-start md:self-auto h-9 px-4"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Print {formatMonthLabel(selectedMonth).split(' ')[0]} Expiry List</span>
+              </Button>
+            </div>
+
+            {/* Metric mini-cards for selected month */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <div className="bg-white/90 p-3 rounded-xl border border-teal-100 shadow-xs flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-teal-100 text-teal-800 flex items-center justify-center font-bold">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold text-muted uppercase">Expiring Batches</p>
+                  <p className="text-lg font-bold text-gray-900 font-mono leading-none mt-0.5">
+                    {monthlyMetrics.totalItems} <span className="text-xs font-normal text-muted">medicines</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white/90 p-3 rounded-xl border border-teal-100 shadow-xs flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-blue-100 text-blue-800 flex items-center justify-center font-bold">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold text-muted uppercase">Total Stock Quantity</p>
+                  <p className="text-lg font-bold text-gray-900 font-mono leading-none mt-0.5">
+                    {monthlyMetrics.totalQty} <span className="text-xs font-normal text-muted">units</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white/90 p-3 rounded-xl border border-teal-100 shadow-xs flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-rose-100 text-rose-800 flex items-center justify-center font-bold">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold text-muted uppercase">Total MRP at Risk</p>
+                  <p className="text-lg font-bold text-rose-700 font-mono leading-none mt-0.5">
+                    ₹{monthlyMetrics.totalValue.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* STATE 1: LOADING */}
         {loading && (
@@ -348,12 +525,18 @@ export function ExpiryAlerts() {
             </div>
             <div>
               <h3 className="text-base font-bold text-teal-800">
-                {filterDate
+                {activeTab === 'monthly'
+                  ? `No Batches Expiring in ${formatMonthLabel(selectedMonth)}`
+                  : filterDate
                   ? `No Batches Expiring On or Before ${formatDate(filterDate)}`
-                  : activeTab === 'expiring' ? 'All Stock is Fresh!' : 'No Expired Batches'}
+                  : activeTab === 'expiring'
+                  ? 'All Stock is Fresh!'
+                  : 'No Expired Batches'}
               </h3>
               <p className="text-xs text-muted mt-1 max-w-sm">
-                {filterDate
+                {activeTab === 'monthly'
+                  ? `There are no medicines or items in inventory set to expire during ${formatMonthLabel(selectedMonth)}.`
+                  : filterDate
                   ? `There are no batches matching the selected target expiry date ${formatDate(filterDate)}.`
                   : activeTab === 'expiring'
                   ? 'No items or batches are set to expire in the next 30 days.'
@@ -382,15 +565,17 @@ export function ExpiryAlerts() {
             <TableBody>
               {displayedBatches.map((batch) => {
                 const item = batch.itemId || {};
-                const isExpired = activeTab === 'expired';
+                const isBatchExpired = batch.status === 'expired' || (batch.expiryDate && new Date(batch.expiryDate) < new Date());
 
                 return (
                   <TableRow
                     key={batch._id}
                     className={
-                      isExpired
+                      isBatchExpired
                         ? 'bg-red-50/30 border-l-4 border-l-red-500'
-                        : 'bg-amber-50/30 border-l-4 border-l-amber-400'
+                        : batch.status === 'expiring_soon'
+                        ? 'bg-amber-50/30 border-l-4 border-l-amber-400'
+                        : 'bg-emerald-50/15 border-l-4 border-l-emerald-400'
                     }
                   >
                     <TableCell className="font-semibold text-primary">
@@ -435,10 +620,14 @@ export function ExpiryAlerts() {
                     </TableCell>
 
                     <TableCell className="text-center">
-                      {isExpired ? (
+                      {isBatchExpired ? (
                         <Badge variant="expired">Expired</Badge>
-                      ) : (
+                      ) : batch.status === 'expiring_soon' ? (
                         <Badge variant="expiring_soon">Expiring Soon</Badge>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          Active
+                        </span>
                       )}
                     </TableCell>
 
@@ -454,7 +643,7 @@ export function ExpiryAlerts() {
                           <span>Edit Expiry</span>
                         </Button>
 
-                        {isExpired && (
+                        {isBatchExpired && (
                           <>
                             <Button
                               variant="outline"
@@ -683,6 +872,22 @@ export function ExpiryAlerts() {
             returnRecord={createdReturnRecord}
           />
         )}
+
+        {/* Printable Expiry Report Modal */}
+        <PrintableExpiryReport
+          isOpen={isReportPrintModalOpen}
+          onClose={() => setIsReportPrintModalOpen(false)}
+          batches={displayedBatches}
+          reportTitle={
+            activeTab === 'monthly'
+              ? `Monthly Medicine Expiry Report — ${formatMonthLabel(selectedMonth)}`
+              : activeTab === 'expired'
+              ? 'Expired Medicines Stock Audit Report'
+              : 'Expiring Soon Medicines Report (30 Days)'
+          }
+          periodLabel={activeTab === 'monthly' ? formatMonthLabel(selectedMonth) : ''}
+          storeType={storeType}
+        />
       </div>
     </div>
   );

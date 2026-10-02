@@ -41,13 +41,16 @@
   #printable-return-area,
   #printable-return-area *,
   #printable-invoice-area,
-  #printable-invoice-area * {
+  #printable-invoice-area *,
+  #printable-expiry-area,
+  #printable-expiry-area * {
     display: revert !important;
   }
 
   #printable-bill-area,
   #printable-return-area,
-  #printable-invoice-area {
+  #printable-invoice-area,
+  #printable-expiry-area {
     position: static !important;
     width: 100% !important;
     margin: 0 !important;

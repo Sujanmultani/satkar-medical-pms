@@ -249,7 +249,7 @@ const getBatchesByStatus = async (req, res, next, targetStatus) => {
 
     const total = await Batch.countDocuments(batchFilter);
     const batches = await Batch.find(batchFilter)
-      .populate('itemId', 'name composition category unit hsnCode storeType')
+      .populate('itemId', 'name composition category unit hsnCode location storeType')
       .populate('supplierId', 'name phone address')
       .sort({ expiryDate: 1 })
       .skip(skip)
@@ -285,6 +285,70 @@ const getExpiringSoonBatches = (req, res, next) => getBatchesByStatus(req, res, 
 // @access  Private
 const getExpiredBatches = (req, res, next) => getBatchesByStatus(req, res, next, 'expired');
 
+// @desc    Get batches expiring in a specific month (YYYY-MM)
+// @route   GET /api/batches/by-month
+// @access  Private
+const getBatchesByMonth = async (req, res, next) => {
+  try {
+    const { month, storeType } = req.query; // 'YYYY-MM', e.g., '2026-10'
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+      return res.status(400).json({
+        error: { code: 'INVALID_MONTH', message: 'Month must be in YYYY-MM format.' },
+      });
+    }
+
+    const [yearStr, monthStr] = month.split('-');
+    const year = parseInt(yearStr, 10);
+    const monthNum = parseInt(monthStr, 10);
+
+    // Buffer to handle UTC vs IST offset cleanly
+    const startDate = new Date(Date.UTC(year, monthNum - 1, 1) - 14 * 3600 * 1000);
+    const endDate = new Date(Date.UTC(year, monthNum, 0, 23, 59, 59, 999) + 14 * 3600 * 1000);
+
+    const batchFilter = {
+      expiryDate: { $gte: startDate, $lte: endDate },
+      qty: { $gt: 0 },
+    };
+
+    if (storeType && ['medical', 'provision'].includes(storeType)) {
+      const items = await Item.find({ storeType }).select('_id').lean();
+      const itemIds = items.map((i) => i._id);
+      batchFilter.itemId = { $in: itemIds };
+    }
+
+    const limit = Math.min(parseInt(req.query.limit, 10) || 1000, 2000);
+
+    const batches = await Batch.find(batchFilter)
+      .populate('itemId', 'name composition category unit hsnCode location storeType')
+      .populate('supplierId', 'name phone address')
+      .sort({ expiryDate: 1 })
+      .limit(limit)
+      .lean();
+
+    // Verify each batch actually falls in the target month (in local or UTC)
+    const filteredBatches = batches.filter((b) => {
+      if (!b.expiryDate) return false;
+      const d = new Date(b.expiryDate);
+      const matchLocal = d.getFullYear() === year && (d.getMonth() + 1) === monthNum;
+      const matchUTC = d.getUTCFullYear() === year && (d.getUTCMonth() + 1) === monthNum;
+      return matchLocal || matchUTC;
+    });
+
+    const batchesWithStatus = filteredBatches.map((b) => ({
+      ...b,
+      status: computeBatchStatus(b.expiryDate),
+    }));
+
+    return res.status(200).json({
+      data: batchesWithStatus,
+      month,
+      total: batchesWithStatus.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createBatch,
   getBatches,
@@ -293,4 +357,5 @@ module.exports = {
   deleteBatch,
   getExpiringSoonBatches,
   getExpiredBatches,
+  getBatchesByMonth,
 };

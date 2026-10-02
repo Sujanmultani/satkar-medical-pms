@@ -8,6 +8,7 @@ const {
   deleteBatch,
   getExpiringSoonBatches,
   getExpiredBatches,
+  getBatchesByMonth,
 } = require('../controllers/batchController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -19,6 +20,7 @@ router.route('/')
 
 router.get('/expiring-soon', getExpiringSoonBatches);
 router.get('/expired', getExpiredBatches);
+router.get('/by-month', getBatchesByMonth);
 
 router.patch('/:id/payment-status', updatePaymentStatus);
 
