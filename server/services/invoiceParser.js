@@ -1,31 +1,35 @@
 /**
- * Invoice Parser Service using Gemini (Vertex AI)
+ * Invoice Parser Service using Gemini (Vertex AI via @google/genai)
  * Sends invoice images directly to Vertex AI Gemini for multimodal structured JSON extraction.
  */
 
-const { VertexAI } = require('@google-cloud/vertexai');
+const path = require('path');
+const fs = require('fs');
+const { GoogleGenAI } = require('@google/genai');
+
+// Ensure GOOGLE_APPLICATION_CREDENTIALS resolves relative to server folder regardless of CWD
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  if (!path.isAbsolute(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = path.resolve(__dirname, '..', process.env.GOOGLE_APPLICATION_CREDENTIALS);
+  }
+} else {
+  const defaultKeyPath = path.resolve(__dirname, '..', 'google-vision-key.json');
+  if (fs.existsSync(defaultKeyPath)) {
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = defaultKeyPath;
+  }
+}
 
 const clientMap = new Map();
 
-const getGenerativeModel = (locationOverride) => {
+const getGenAiClient = (location) => {
+  const loc = location || process.env.GCP_LOCATION || 'global';
   const project = process.env.GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || 'satkar-medical-ocr';
-  const location = locationOverride || process.env.GCP_LOCATION || 'us-central1';
 
-  if (!clientMap.has(location)) {
-    clientMap.set(location, new VertexAI({ project, location }));
+  if (!clientMap.has(loc)) {
+    clientMap.set(loc, new GoogleGenAI({ vertexai: true, project, location: loc }));
   }
 
-  const vertexClient = clientMap.get(location);
-  const modelName = process.env.GEMINI_MODEL_NAME || 'gemini-2.5-flash';
-
-  return vertexClient.getGenerativeModel({
-    model: modelName,
-    generationConfig: {
-      responseMimeType: 'application/json',
-      temperature: 0.1,
-      maxOutputTokens: 8192,
-    },
-  });
+  return clientMap.get(loc);
 };
 
 // Helper to normalize MM/YY, MM/YYYY, or DD/MM/YYYY dates to ISO string (YYYY-MM-DD)
@@ -142,13 +146,45 @@ OUTPUT JSON FORMAT (Strict JSON):
 `;
 
 /**
- * Internal single extraction attempt using Gemini via Vertex AI with multi-region fallback.
+ * Helper to identify transient / fallback-eligible Vertex AI errors
+ */
+const isRetryableError = (err) => {
+  if (!err) return false;
+  const msg = String(err.message || '');
+  const status = String(err.status || err.code || err.statusCode || '');
+  return (
+    status === '404' ||
+    status === '429' ||
+    status === '503' ||
+    msg.includes('404') ||
+    msg.includes('NOT_FOUND') ||
+    msg.includes('429') ||
+    msg.includes('RESOURCE_EXHAUSTED') ||
+    msg.includes('503') ||
+    msg.includes('UNAVAILABLE') ||
+    msg.includes('does not exist') ||
+    msg.includes('not found')
+  );
+};
+
+/**
+ * Internal single extraction attempt using Gemini via Vertex AI with multi-location and model fallback.
  * @param {Buffer|Array<Object>} inputData - Image buffer or array of { buffer, mimeType }
  * @param {string} mimeType - Image mime type
  * @returns {Promise<Object>} Extracted invoice header & line items
  */
 const attemptExtraction = async (inputData, mimeType = 'image/jpeg') => {
-  const locations = ['us-central1', 'us-east4', 'us-west1', 'europe-west1'];
+  const primaryModel = process.env.GEMINI_MODEL_NAME || 'gemini-3-flash-preview';
+  const fallbackModels = (process.env.GEMINI_FALLBACK_MODELS || 'gemini-2.5-flash')
+    .split(',')
+    .map((m) => m.trim())
+    .filter(Boolean);
+  const modelsToTry = [primaryModel, ...fallbackModels.filter((m) => m !== primaryModel)];
+
+  const primaryLoc = process.env.GCP_LOCATION || 'global';
+  const locationsToTry = [primaryLoc];
+  if (!locationsToTry.includes('us-central1')) locationsToTry.push('us-central1');
+
   let lastError = null;
 
   const pageArray = Array.isArray(inputData)
@@ -166,103 +202,116 @@ const attemptExtraction = async (inputData, mimeType = 'image/jpeg') => {
     text: EXTRACTION_PROMPT,
   };
 
-  for (let i = 0; i < locations.length; i++) {
-    const loc = locations[i];
-    try {
-      const generativeModel = getGenerativeModel(loc);
+  for (const model of modelsToTry) {
+    for (const loc of locationsToTry) {
+      try {
+        const ai = getGenAiClient(loc);
 
-      const response = await generativeModel.generateContent({
-        contents: [{ role: 'user', parts: [...imageParts, textPart] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.1,
-          maxOutputTokens: 8192,
-        },
-      });
+        const response = await ai.models.generateContent({
+          model,
+          contents: [{ role: 'user', parts: [...imageParts, textPart] }],
+          config: {
+            responseMimeType: 'application/json',
+            temperature: 0.1,
+            maxOutputTokens: 8192,
+          },
+        });
 
-      const candidate = response?.response?.candidates?.[0];
-      const textOutput = candidate?.content?.parts?.[0]?.text;
+        let textOutput = response?.text;
 
-      if (!textOutput) {
-        throw new Error('Gemini API returned an empty response.');
-      }
+        if (!textOutput) {
+          throw new Error('Gemini API returned an empty response.');
+        }
 
-      const parsedData = JSON.parse(textOutput);
+        // Strip any ```json or ``` code fences
+        textOutput = textOutput.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
 
-      const validCategories = ['Tablet', 'Syrup', 'Capsule', 'Injection', 'Insulin', 'Ointment', 'Drops', 'Other'];
-      const validUnits = ['strip', 'bottle', 'vial', 'tube', 'pack', 'piece'];
+        let parsedData;
+        try {
+          parsedData = JSON.parse(textOutput);
+        } catch (jsonErr) {
+          throw new Error(`Failed to parse Gemini output as JSON: ${jsonErr.message}`);
+        }
 
-      // Post-process and normalize fields
-      const rawItems = (parsedData.items || []).map((item) => {
-        const parsedQty = typeof item.qty === 'number' && !isNaN(item.qty) ? item.qty : parseInt(item.qty, 10);
-        const parsedRate = typeof item.purchaseRate === 'number' && !isNaN(item.purchaseRate) ? item.purchaseRate : parseFloat(item.purchaseRate);
-        const parsedMrp = typeof item.mrp === 'number' && !isNaN(item.mrp) ? item.mrp : parseFloat(item.mrp);
-        const parsedGst = typeof item.gstPercent === 'number' && !isNaN(item.gstPercent) ? item.gstPercent : parseFloat(item.gstPercent);
-        const parsedLineTotal = typeof item.printedLineTotal === 'number' && !isNaN(item.printedLineTotal) ? item.printedLineTotal : parseFloat(item.printedLineTotal);
+        const validCategories = ['Tablet', 'Syrup', 'Capsule', 'Injection', 'Insulin', 'Ointment', 'Drops', 'Other'];
+        const validUnits = ['strip', 'bottle', 'vial', 'tube', 'pack', 'piece'];
+
+        // Post-process and normalize fields
+        const rawItems = (parsedData.items || []).map((item) => {
+          const parsedQty = typeof item.qty === 'number' && !isNaN(item.qty) ? item.qty : parseInt(item.qty, 10);
+          const parsedRate = typeof item.purchaseRate === 'number' && !isNaN(item.purchaseRate) ? item.purchaseRate : parseFloat(item.purchaseRate);
+          const parsedMrp = typeof item.mrp === 'number' && !isNaN(item.mrp) ? item.mrp : parseFloat(item.mrp);
+          const parsedGst = typeof item.gstPercent === 'number' && !isNaN(item.gstPercent) ? item.gstPercent : parseFloat(item.gstPercent);
+          const parsedLineTotal = typeof item.printedLineTotal === 'number' && !isNaN(item.printedLineTotal) ? item.printedLineTotal : parseFloat(item.printedLineTotal);
+
+          return {
+            name: item.name ? String(item.name).trim() : 'Unspecified Medicine',
+            composition: item.composition ? String(item.composition).trim() : null,
+            category: validCategories.includes(item.category) ? item.category : 'Tablet',
+            unit: validUnits.includes(item.unit) ? item.unit : 'strip',
+            hsnCode: item.hsnCode ? String(item.hsnCode).trim() : null,
+            batchNo: item.batchNo ? String(item.batchNo).trim() : 'NO-BATCH',
+            expiryDate: parseExpiryDate(item.expiryDate) || item.expiryDate || null,
+            qty: !isNaN(parsedQty) && parsedQty > 0 ? parsedQty : 1,
+            purchaseRate: !isNaN(parsedRate) && parsedRate >= 0 ? parsedRate : 0,
+            mrp: !isNaN(parsedMrp) && parsedMrp >= 0 ? parsedMrp : 0,
+            gstPercent: !isNaN(parsedGst) && parsedGst >= 0 ? parsedGst : 12,
+            printedLineTotal: !isNaN(parsedLineTotal) && parsedLineTotal > 0 ? parsedLineTotal : null,
+            confidence: item.confidence === 'low' ? 'low' : 'high',
+          };
+        });
+
+        // Deduplicate/merge items sharing exact same batch and price
+        const seenMap = new Map();
+        const items = [];
+
+        for (const item of rawItems) {
+          const normalizedBatch = item.batchNo ? item.batchNo.trim().toUpperCase() : '';
+          const dedupKey = `${item.name.toUpperCase()}_${normalizedBatch}_${item.purchaseRate}_${item.mrp}`;
+
+          if (normalizedBatch && seenMap.has(dedupKey)) {
+            const existingIndex = seenMap.get(dedupKey);
+            const existing = items[existingIndex];
+            existing.qty = Math.max(existing.qty, item.qty);
+            existing.mrp = Math.max(existing.mrp, item.mrp);
+            existing.confidence = 'low';
+          } else {
+            if (normalizedBatch) {
+              seenMap.set(dedupKey, items.length);
+            }
+            items.push({ ...item });
+          }
+        }
+
+        const pSub = typeof parsedData.printedSubtotal === 'number' && !isNaN(parsedData.printedSubtotal) ? parsedData.printedSubtotal : parseFloat(parsedData.printedSubtotal);
+        const pRound = typeof parsedData.printedRoundOff === 'number' && !isNaN(parsedData.printedRoundOff) ? parsedData.printedRoundOff : parseFloat(parsedData.printedRoundOff);
+        const pGrand = typeof parsedData.printedGrandTotal === 'number' && !isNaN(parsedData.printedGrandTotal) ? parsedData.printedGrandTotal : parseFloat(parsedData.printedGrandTotal);
 
         return {
-          name: item.name ? String(item.name).trim() : 'Unspecified Medicine',
-          composition: item.composition ? String(item.composition).trim() : null,
-          category: validCategories.includes(item.category) ? item.category : 'Tablet',
-          unit: validUnits.includes(item.unit) ? item.unit : 'strip',
-          hsnCode: item.hsnCode ? String(item.hsnCode).trim() : null,
-          batchNo: item.batchNo ? String(item.batchNo).trim() : 'NO-BATCH',
-          expiryDate: parseExpiryDate(item.expiryDate) || item.expiryDate || null,
-          qty: !isNaN(parsedQty) && parsedQty > 0 ? parsedQty : 1,
-          purchaseRate: !isNaN(parsedRate) && parsedRate >= 0 ? parsedRate : 0,
-          mrp: !isNaN(parsedMrp) && parsedMrp >= 0 ? parsedMrp : 0,
-          gstPercent: !isNaN(parsedGst) && parsedGst >= 0 ? parsedGst : 12,
-          printedLineTotal: !isNaN(parsedLineTotal) && parsedLineTotal > 0 ? parsedLineTotal : null,
-          confidence: item.confidence === 'low' ? 'low' : 'high',
+          supplierName: parsedData.supplierName ? String(parsedData.supplierName).trim() : 'Pharma Distributor',
+          invoiceNo: parsedData.invoiceNo ? String(parsedData.invoiceNo).trim() : `INV-${Date.now().toString().slice(-6)}`,
+          invoiceDate: parseExpiryDate(parsedData.invoiceDate) || parsedData.invoiceDate || new Date().toISOString().split('T')[0],
+          printedSubtotal: !isNaN(pSub) ? pSub : null,
+          printedRoundOff: !isNaN(pRound) ? pRound : null,
+          printedGrandTotal: !isNaN(pGrand) ? pGrand : null,
+          items,
         };
-      });
+      } catch (err) {
+        lastError = err;
+        const retryable = isRetryableError(err);
 
-      // Deduplicate/merge items sharing exact same batch and price
-      const seenMap = new Map();
-      const items = [];
+        if (!retryable) {
+          // Do not retry on invalid-JSON or bad-input errors
+          throw err;
+        }
 
-      for (const item of rawItems) {
-        const normalizedBatch = item.batchNo ? item.batchNo.trim().toUpperCase() : '';
-        const dedupKey = `${item.name.toUpperCase()}_${normalizedBatch}_${item.purchaseRate}_${item.mrp}`;
+        console.warn(`[Gemini OCR Fallback] Model "${model}" in location "${loc}" failed: ${err.message}. Retrying fallback...`);
 
-        if (normalizedBatch && seenMap.has(dedupKey)) {
-          const existingIndex = seenMap.get(dedupKey);
-          const existing = items[existingIndex];
-          existing.qty = Math.max(existing.qty, item.qty);
-          existing.mrp = Math.max(existing.mrp, item.mrp);
-          existing.confidence = 'low';
-        } else {
-          if (normalizedBatch) {
-            seenMap.set(dedupKey, items.length);
-          }
-          items.push({ ...item });
+        const is429 = err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED') || err.code === 429 || err.status === 'RESOURCE_EXHAUSTED';
+        if (is429) {
+          await new Promise((res) => setTimeout(res, 1500));
         }
       }
-
-      const pSub = typeof parsedData.printedSubtotal === 'number' && !isNaN(parsedData.printedSubtotal) ? parsedData.printedSubtotal : parseFloat(parsedData.printedSubtotal);
-      const pRound = typeof parsedData.printedRoundOff === 'number' && !isNaN(parsedData.printedRoundOff) ? parsedData.printedRoundOff : parseFloat(parsedData.printedRoundOff);
-      const pGrand = typeof parsedData.printedGrandTotal === 'number' && !isNaN(parsedData.printedGrandTotal) ? parsedData.printedGrandTotal : parseFloat(parsedData.printedGrandTotal);
-
-      return {
-        supplierName: parsedData.supplierName ? String(parsedData.supplierName).trim() : 'Pharma Distributor',
-        invoiceNo: parsedData.invoiceNo ? String(parsedData.invoiceNo).trim() : `INV-${Date.now().toString().slice(-6)}`,
-        invoiceDate: parseExpiryDate(parsedData.invoiceDate) || parsedData.invoiceDate || new Date().toISOString().split('T')[0],
-        printedSubtotal: !isNaN(pSub) ? pSub : null,
-        printedRoundOff: !isNaN(pRound) ? pRound : null,
-        printedGrandTotal: !isNaN(pGrand) ? pGrand : null,
-        items,
-      };
-    } catch (err) {
-      lastError = err;
-      const is429 = err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED') || err.code === 429 || err.status === 'RESOURCE_EXHAUSTED';
-
-      if (is429 && i < locations.length - 1) {
-        console.warn(`[Gemini OCR 429 Rate Limit] Region ${loc} rate limited. Retrying with fallback region ${locations[i + 1]} in 1.5s...`);
-        await new Promise((res) => setTimeout(res, 1500));
-        continue;
-      }
-
-      throw err;
     }
   }
 

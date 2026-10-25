@@ -112,6 +112,7 @@ const scanInvoice = async (req, res, next) => {
       error: {
         code: 'OCR_SCAN_FAILED',
         message: 'Could not read this invoice — please enter items manually.',
+        detail: String(error.message || '').slice(0, 300),
       },
     });
   }
