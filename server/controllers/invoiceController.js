@@ -168,6 +168,8 @@ const confirmInvoice = async (req, res, next) => {
     let createdItemsCount = 0;
     let createdBatchesCount = 0;
     let totalBaseAmount = 0;
+    let totalCgstAmount = 0;
+    let totalSgstAmount = 0;
     let totalInvoiceGst = 0;
     const invoiceItemsPayload = [];
 
@@ -235,7 +237,10 @@ const confirmInvoice = async (req, res, next) => {
       const batchExpiry = expiryDate ? new Date(expiryDate) : null;
       const batchStatus = batchExpiry ? computeBatchStatus(batchExpiry) : 'active';
       const lineBase = roundMoney(numQty * numPurchaseRate);
-      const lineGst = roundMoney((lineBase * numGstPercent) / 100);
+      const halfRate = (numGstPercent / 2) / 100;
+      const lineCgst = roundMoney(lineBase * halfRate);
+      const lineSgst = roundMoney(lineBase * halfRate);
+      const lineGst = roundMoney(lineCgst + lineSgst);
 
       // Create Batch (physical stock includes paid + free units; cost uses paid qty only)
       const batch = await Batch.create({
@@ -259,7 +264,9 @@ const confirmInvoice = async (req, res, next) => {
 
       createdBatchesCount++;
       totalBaseAmount = roundMoney(totalBaseAmount + lineBase);
-      totalInvoiceGst = roundMoney(totalInvoiceGst + lineGst);
+      totalCgstAmount = roundMoney(totalCgstAmount + lineCgst);
+      totalSgstAmount = roundMoney(totalSgstAmount + lineSgst);
+      totalInvoiceGst = roundMoney(totalCgstAmount + totalSgstAmount);
 
       invoiceItemsPayload.push({
         batchId: batch._id,
@@ -267,8 +274,8 @@ const confirmInvoice = async (req, res, next) => {
       });
     }
 
-    const totalCgst = roundMoney(totalInvoiceGst / 2);
-    const totalSgst = roundMoney(totalInvoiceGst - totalCgst);
+    const totalCgst = totalCgstAmount;
+    const totalSgst = totalSgstAmount;
     const calculatedAmount = roundMoney(totalBaseAmount + totalInvoiceGst);
 
     const validPrintedGrandTotal =

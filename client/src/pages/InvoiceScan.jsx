@@ -406,12 +406,25 @@ export function InvoiceScan() {
         : null;
 
       let finalRate = Number(item.purchaseRate) || 0;
-      if (!isEdited && pTotal !== null && Number(item.qty) > 0) {
-        const gstPercent = Number(item.gstPercent) || 0;
-        const lineBase = pTotal / (1 + gstPercent / 100);
-        finalRate = roundMoney(lineBase / Number(item.qty));
+      const qty = Number(item.qty) || 0;
+      const gstPercent = Number(item.gstPercent) || 0;
+      const discPercent = Number(item.discPercent) || 0;
+
+      if (!isEdited && pTotal !== null && qty > 0) {
+        const expectedBase = roundMoney(qty * finalRate * (1 - discPercent / 100));
+        const expectedGross = roundMoney(expectedBase * (1 + gstPercent / 100));
+        const diffBase = Math.abs(pTotal - expectedBase);
+        const diffGross = Math.abs(pTotal - expectedGross);
+        const isGross = diffGross < diffBase && pTotal > expectedBase;
+
+        if (isGross) {
+          const lineBase = roundMoney(pTotal / (1 + gstPercent / 100));
+          finalRate = roundMoney(lineBase / qty);
+        } else {
+          // pTotal is Base (Taxable Amount)
+          finalRate = roundMoney(pTotal / qty);
+        }
       } else if (!isEdited && pTotal === null) {
-        const discPercent = Number(item.discPercent) || 0;
         finalRate = roundMoney(finalRate * (1 - discPercent / 100));
       }
 
@@ -456,22 +469,46 @@ export function InvoiceScan() {
     const rate = Number(item.purchaseRate) || 0;
     const discPercent = Number(item.discPercent) || 0;
     const gstPercent = Number(item.gstPercent) || 0;
+    const halfGstRate = (gstPercent / 2) / 100;
+
+    let lineBase = 0;
+    let lineCgst = 0;
+    let lineSgst = 0;
+    let lineGst = 0;
+    let lineTotal = 0;
 
     if (!isEdited && pTotal !== null) {
-      const lineBase = roundMoney(pTotal / (1 + gstPercent / 100));
-      const lineGst = roundMoney(pTotal - lineBase);
-      return {
-        lineBase,
-        lineGst,
-        lineTotal: pTotal,
-      };
+      const expectedBase = roundMoney(qty * rate * (1 - discPercent / 100));
+      const expectedGross = roundMoney(expectedBase * (1 + gstPercent / 100));
+      const diffBase = Math.abs(pTotal - expectedBase);
+      const diffGross = Math.abs(pTotal - expectedGross);
+      const isGross = diffGross < diffBase && pTotal > expectedBase;
+
+      if (isGross) {
+        lineBase = roundMoney(pTotal / (1 + gstPercent / 100));
+        lineCgst = roundMoney(lineBase * halfGstRate);
+        lineSgst = roundMoney(lineBase * halfGstRate);
+        lineGst = roundMoney(lineCgst + lineSgst);
+        lineTotal = pTotal;
+      } else {
+        lineBase = pTotal;
+        lineCgst = roundMoney(lineBase * halfGstRate);
+        lineSgst = roundMoney(lineBase * halfGstRate);
+        lineGst = roundMoney(lineCgst + lineSgst);
+        lineTotal = roundMoney(lineBase + lineGst);
+      }
+    } else {
+      lineBase = roundMoney(qty * rate * (1 - discPercent / 100));
+      lineCgst = roundMoney(lineBase * halfGstRate);
+      lineSgst = roundMoney(lineBase * halfGstRate);
+      lineGst = roundMoney(lineCgst + lineSgst);
+      lineTotal = roundMoney(lineBase + lineGst);
     }
 
-    const lineBase = roundMoney(qty * rate * (1 - discPercent / 100));
-    const lineGst = roundMoney((lineBase * gstPercent) / 100);
-    const lineTotal = roundMoney(lineBase + lineGst);
     return {
       lineBase,
+      lineCgst,
+      lineSgst,
       lineGst,
       lineTotal,
     };
@@ -481,17 +518,26 @@ export function InvoiceScan() {
     calculatedRowTotals.reduce((sum, row) => sum + row.lineBase, 0)
   );
 
-  const totalGstAmount = roundMoney(
-    calculatedRowTotals.reduce((sum, row) => sum + row.lineGst, 0)
+  const totalCgstAmount = roundMoney(
+    calculatedRowTotals.reduce((sum, row) => sum + row.lineCgst, 0)
   );
 
-  const totalCgstAmount = roundMoney(totalGstAmount / 2);
-  const totalSgstAmount = roundMoney(totalGstAmount - totalCgstAmount);
+  const totalSgstAmount = roundMoney(
+    calculatedRowTotals.reduce((sum, row) => sum + row.lineSgst, 0)
+  );
+
+  const totalGstAmount = roundMoney(totalCgstAmount + totalSgstAmount);
+
   const totalCalculatedAmount = roundMoney(
     calculatedRowTotals.reduce((sum, row) => sum + row.lineTotal, 0)
   );
+
+  const calculatedGrandTotal = roundMoney(
+    totalCalculatedAmount + (typeof printedRoundOff === 'number' ? printedRoundOff : 0)
+  );
+
   const mismatchAmount =
-    printedGrandTotal !== null ? roundMoney(totalCalculatedAmount - printedGrandTotal) : 0;
+    printedGrandTotal !== null ? roundMoney(calculatedGrandTotal - printedGrandTotal) : 0;
   const hasSignificantMismatch = Math.abs(mismatchAmount) > 1;
 
   return (
@@ -1293,6 +1339,11 @@ export function InvoiceScan() {
                           {/* Per-row Total */}
                           <td className="py-2 px-3 min-w-[120px] text-right font-mono font-bold text-gray-900 text-xs">
                             ₹{lineTotal.toFixed(2)}
+                            {rowCalc.lineGst > 0 && (
+                              <span className="block text-[9px] font-mono text-muted font-normal mt-0.5 whitespace-nowrap">
+                                (Base: ₹{rowCalc.lineBase.toFixed(2)} + Tax: ₹{rowCalc.lineGst.toFixed(2)})
+                              </span>
+                            )}
                           </td>
 
                           {/* Delete Row */}
